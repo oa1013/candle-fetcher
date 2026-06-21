@@ -21,6 +21,12 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
+# Comparison outputs
+data/comparisons/reports/*
+data/comparisons/tables/*
+!data/comparisons/reports/.gitkeep
+!data/comparisons/tables/.gitkeep
+
 # OS files
 .DS_Store
 Thumbs.db
