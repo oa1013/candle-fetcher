@@ -54,7 +54,7 @@ class MT5FetchConfig:
     """
     Settings for fetching raw candles from MetaTrader 5.
 
-    This fetcher saves raw candles into data/raw/.
+    This saves raw candles into data/raw/.
     Session filtering happens later in the runner notebooks.
     """
 
@@ -68,7 +68,7 @@ class MT5FetchConfig:
     output_folder: str | Path = RAW_DATA_DIR
     chunk_days: int = 31
 
-    # The calendar dates are interpreted in this timezone before converting to UTC.
+    # Calendar dates are interpreted in this timezone before converting to UTC.
     date_timezone_name: str = "America/New_York"
 
 
@@ -318,7 +318,6 @@ def save_raw_candles_to_csv(
     output_folder.mkdir(parents=True, exist_ok=True)
 
     output_path = output_folder / filename
-
     df.to_csv(output_path, index=False)
 
     return output_path
