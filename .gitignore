@@ -1,0 +1,26 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local environment / secrets
+.env
+*.secret
+
+# Data - do not upload raw broker/FTMO CSVs by default
+data/raw/*
+data/processed/*
+*.csv
+
+# Keep folder structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
