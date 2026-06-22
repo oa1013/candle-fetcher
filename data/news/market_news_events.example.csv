@@ -1,0 +1,4 @@
+datetime,headline,event_type,importance,source,url,symbol
+2024-04-10 08:30:00+00:00,Example CPI report release,economic,high,manual,,US100.cash
+2024-05-01 18:00:00+00:00,Example FOMC statement,economic,high,manual,,US100.cash
+2024-06-07 12:30:00+00:00,Example Nonfarm Payrolls release,economic,high,manual,,US100.cash
