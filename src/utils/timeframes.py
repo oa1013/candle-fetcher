@@ -1,43 +1,66 @@
 SUPPORTED_TIMEFRAMES = {
-    "1m",
-    "5m",
-    "15m",
-    "30m",
-    "1h",
-    "4h",
-    "1d",
+    "M1",
+    "M5",
+    "M15",
+    "M30",
+    "H1",
+    "H4",
+    "D1",
 }
 
 
 TIMEFRAME_ALIASES = {
-    "m1": "1m",
-    "m5": "5m",
-    "m15": "15m",
-    "m30": "30m",
-    "h1": "1h",
-    "h4": "4h",
-    "d1": "1d",
+    "1m": "M1",
+    "m1": "M1",
+    "M1": "M1",
+
+    "5m": "M5",
+    "m5": "M5",
+    "M5": "M5",
+
+    "15m": "M15",
+    "m15": "M15",
+    "M15": "M15",
+
+    "30m": "M30",
+    "m30": "M30",
+    "M30": "M30",
+
+    "1h": "H1",
+    "h1": "H1",
+    "H1": "H1",
+
+    "4h": "H4",
+    "h4": "H4",
+    "H4": "H4",
+
+    "1d": "D1",
+    "d1": "D1",
+    "D1": "D1",
 }
 
 
 def normalize_timeframe(timeframe: str) -> str:
     """
-    Converts timeframe input into a standard format.
+    Converts user-friendly timeframe input into the MT5-style format.
 
-    Example:
-    M1 -> 1m
-    m1 -> 1m
-    H1 -> 1h
-    1m -> 1m
+    Examples:
+        1m -> M1
+        m1 -> M1
+        M1 -> M1
+        5m -> M5
+        1h -> H1
     """
 
     if timeframe is None:
-        return "1m"
+        return "M1"
 
-    timeframe = str(timeframe).strip().lower()
+    timeframe = str(timeframe).strip()
 
     if timeframe in TIMEFRAME_ALIASES:
         timeframe = TIMEFRAME_ALIASES[timeframe]
+    else:
+        timeframe = timeframe.upper()
 
     if timeframe not in SUPPORTED_TIMEFRAMES:
         raise ValueError(

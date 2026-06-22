@@ -132,22 +132,34 @@ def save_session_csv(
     start_date=None,
     end_date=None,
     suffix: str | None = None,
+    output_name: str | None = None,
 ) -> dict:
     """
     Save a filtered session DataFrame to the correct processed folder.
 
-    Returns a small result dictionary.
+    If output_name is provided, it will be used as the CSV filename.
+    Otherwise, the normal automatic filename will be created.
     """
+
     output_folder = get_output_folder(session_name)
 
-    filename = build_output_filename(
-        session_name=session_name,
-        symbol=symbol,
-        timeframe=timeframe,
-        start_date=start_date,
-        end_date=end_date,
-        suffix=suffix,
-    )
+    if output_name:
+        clean_name = str(output_name).strip()
+
+        if clean_name.lower().endswith(".csv"):
+            clean_name = clean_name[:-4]
+
+        filename = f"{clean_filename_part(clean_name)}.csv"
+
+    else:
+        filename = build_output_filename(
+            session_name=session_name,
+            symbol=symbol,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+            suffix=suffix,
+        )
 
     output_path = save_dataframe_to_csv(
         df=df,

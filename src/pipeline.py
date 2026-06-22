@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from .utils.timeframes import normalize_timeframe
+
 from .config import (
     DEFAULT_INPUT_PATTERN,
     DEFAULT_SYMBOL,
@@ -35,7 +37,8 @@ def run_session_pipeline(
     input_pattern: str = DEFAULT_INPUT_PATTERN,
     save_output: bool = True,
     output_suffix: str | None = None,
-) -> dict:
+    output_name: str | None = None,
+    ) -> dict:
     """
     Run the full candle filtering pipeline.
 
@@ -56,6 +59,8 @@ def run_session_pipeline(
         run_session_pipeline("all_sessions", start_date="2023/12/03", end_date="2024/12/03")
     """
     session_name = session_name.strip().lower()
+    timeframe = normalize_timeframe(timeframe)
+
     session_config = get_session_config(session_name)
     timezone_name = session_config["timezone"]
 
@@ -119,8 +124,8 @@ def run_session_pipeline(
             start_date=start_date,
             end_date=end_date,
             suffix=output_suffix,
-        )
-
+            output_name=output_name,
+)
         print_export_summary(export_result)
 
     # 5. Return result

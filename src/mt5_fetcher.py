@@ -12,6 +12,8 @@ import pandas as pd
 
 from .config import DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, RAW_DATA_DIR
 
+from .utils.timeframes import normalize_timeframe
+
 
 UTC_TZ = timezone.utc
 
@@ -119,8 +121,8 @@ def date_range_to_utc_bounds(
 # ---------------------------------------------------------------------------
 
 def get_mt5_timeframe(timeframe: str) -> int:
-    """Convert a timeframe label like M1 or M5 into an MT5 timeframe constant."""
-    label = timeframe.strip().upper()
+    """Convert a timeframe label like M1, M5, or 1m into an MT5 timeframe constant."""
+    label = normalize_timeframe(timeframe)
 
     if label not in TIMEFRAME_MAP:
         available = ", ".join(TIMEFRAME_MAP.keys())
@@ -343,7 +345,8 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
         timezone_name=config.date_timezone_name,
     )
 
-    timeframe_mt5 = get_mt5_timeframe(config.timeframe)
+    timeframe_label = normalize_timeframe(config.timeframe)
+    timeframe_mt5 = get_mt5_timeframe(timeframe_label)
 
     initialize_mt5()
 
@@ -368,7 +371,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
 
     filename = make_raw_output_filename(
         symbol=config.symbol,
-        timeframe=config.timeframe,
+        timeframe=timeframe_label,
         range_name=config.range_name,
         start_day=start_day,
         end_day=end_day,
@@ -387,7 +390,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
         "first_datetime_utc": str(raw_df["datetime"].iloc[0]),
         "last_datetime_utc": str(raw_df["datetime"].iloc[-1]),
         "symbol": config.symbol,
-        "timeframe": config.timeframe,
+        "timeframe": timeframe_label,        
         "start_date": config.start_date,
         "end_date": config.end_date,
     }
