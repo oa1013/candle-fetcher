@@ -30,7 +30,10 @@ from src.volatility_jumps import (
 )
 from src.volatility_jump_exports import (
     save_volatility_jump_result,
-    print_exported_jump_paths,
+)
+from src.volatility_jump_comparison import (
+    compare_jump_profiles,
+    format_jump_profile_comparison,
 )
 
 
@@ -70,9 +73,28 @@ DEFAULT_CSV_PATH = (
     / "us100_cash_M1_all_sessions_2024_01_01_to_2024_12_31.csv"
 )
 
+DEFAULT_COMPARE_CSV_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "processed"
+    / "new_york"
+    / "us100_cash_M1_new_york_2021_01_01_to_2021_12_31.csv"
+)
+
 csv_path_input = st.sidebar.text_input(
     "CSV file path",
     value=str(DEFAULT_CSV_PATH),
+)
+
+compare_csvs = st.sidebar.checkbox(
+    "Compare with another CSV",
+    value=False,
+)
+
+compare_csv_path_input = st.sidebar.text_input(
+    "Comparison CSV path",
+    value=str(DEFAULT_COMPARE_CSV_PATH),
+    disabled=not compare_csvs,
 )
 
 rolling_window = st.sidebar.number_input(
@@ -122,7 +144,7 @@ save_results = st.sidebar.checkbox(
 st.title("Volatility Jump Runner")
 
 st.caption(
-    "Detect volatility spikes, review jump tables, and prepare for CSV comparison/news matching."
+    "Detect volatility spikes, compare CSVs, and prepare for related news matching."
 )
 
 
@@ -142,6 +164,16 @@ if not csv_path.is_absolute():
 
 if not csv_path.exists():
     st.error(f"CSV file was not found: {csv_path}")
+    st.stop()
+
+
+compare_csv_path = Path(compare_csv_path_input)
+
+if not compare_csv_path.is_absolute():
+    compare_csv_path = PROJECT_ROOT / compare_csv_path
+
+if compare_csvs and not compare_csv_path.exists():
+    st.error(f"Comparison CSV file was not found: {compare_csv_path}")
     st.stop()
 
 
@@ -201,7 +233,7 @@ col4.metric(
 
 
 # ---------------------------------------------------------------------------
-# Charts
+# Price chart
 # ---------------------------------------------------------------------------
 
 st.subheader("Price chart with detected jumps")
@@ -244,6 +276,10 @@ st.plotly_chart(
 )
 
 
+# ---------------------------------------------------------------------------
+# Jump score chart
+# ---------------------------------------------------------------------------
+
 st.subheader("Rolling volatility and jump score")
 
 jump_score_fig = go.Figure()
@@ -278,7 +314,7 @@ st.plotly_chart(
 
 
 # ---------------------------------------------------------------------------
-# Table
+# Top jumps table
 # ---------------------------------------------------------------------------
 
 st.subheader("Top volatility jumps")
@@ -289,6 +325,74 @@ st.dataframe(
     friendly_jumps,
     use_container_width=True,
 )
+
+
+# ---------------------------------------------------------------------------
+# CSV comparison
+# ---------------------------------------------------------------------------
+
+if compare_csvs:
+    st.subheader("CSV jump comparison")
+
+    with st.spinner("Comparing CSV jump profiles..."):
+        comparison_df = compare_jump_profiles(
+            csv_paths=[
+                csv_path,
+                compare_csv_path,
+            ],
+            labels=[
+                csv_path.stem,
+                compare_csv_path.stem,
+            ],
+            rolling_window=int(rolling_window),
+            threshold=float(jump_threshold),
+        )
+
+    friendly_comparison = format_jump_profile_comparison(comparison_df)
+
+    st.dataframe(
+        friendly_comparison,
+        use_container_width=True,
+    )
+
+    comparison_metric = st.selectbox(
+        "Comparison chart metric",
+        [
+            "total_jumps",
+            "jump_rate_pct",
+            "largest_jump_score",
+            "avg_jump_score",
+        ],
+        format_func={
+            "total_jumps": "Total jumps",
+            "jump_rate_pct": "Jump rate %",
+            "largest_jump_score": "Largest jump score",
+            "avg_jump_score": "Average jump score",
+        }.get,
+    )
+
+    comparison_chart = go.Figure()
+
+    comparison_chart.add_trace(
+        go.Bar(
+            x=comparison_df["label"],
+            y=comparison_df[comparison_metric],
+            name=comparison_metric,
+        )
+    )
+
+    comparison_chart.update_layout(
+        template=plotly_template,
+        height=350,
+        margin=dict(l=20, r=20, t=40, b=20),
+        xaxis_title="CSV",
+        yaxis_title=comparison_metric,
+    )
+
+    st.plotly_chart(
+        comparison_chart,
+        use_container_width=True,
+    )
 
 
 # ---------------------------------------------------------------------------
