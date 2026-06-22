@@ -35,6 +35,10 @@ from src.volatility_jump_comparison import (
     compare_jump_profiles,
     format_jump_profile_comparison,
 )
+from src.news_matcher import (
+    match_news_to_jumps_from_csv,
+    format_news_matches_table,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +99,27 @@ compare_csv_path_input = st.sidebar.text_input(
     "Comparison CSV path",
     value=str(DEFAULT_COMPARE_CSV_PATH),
     disabled=not compare_csvs,
+)
+show_related_news = st.sidebar.checkbox(
+    "Show related news/events",
+    value=False,
+)
+
+DEFAULT_NEWS_PATH = PROJECT_ROOT / "data" / "news" / "market_news_events.csv"
+
+news_path_input = st.sidebar.text_input(
+    "News/events CSV path",
+    value=str(DEFAULT_NEWS_PATH),
+    disabled=not show_related_news,
+)
+
+news_window_minutes = st.sidebar.number_input(
+    "News match window minutes",
+    min_value=5,
+    max_value=1440,
+    value=30,
+    step=5,
+    disabled=not show_related_news,
 )
 
 rolling_window = st.sidebar.number_input(
@@ -393,6 +418,47 @@ if compare_csvs:
         comparison_chart,
         use_container_width=True,
     )
+    
+# ---------------------------------------------------------------------------
+# Related news/events
+# ---------------------------------------------------------------------------
+
+if show_related_news:
+    st.subheader("Related news / events")
+
+    news_path = Path(news_path_input)
+
+    if not news_path.is_absolute():
+        news_path = PROJECT_ROOT / news_path
+
+    if not news_path.exists():
+        st.warning(
+            f"News/events CSV was not found: {news_path}. "
+            "Create this file later to match news to volatility jumps."
+        )
+
+    else:
+        news_matches = match_news_to_jumps_from_csv(
+            jump_df=top_jumps,
+            news_path=news_path,
+            window_minutes=int(news_window_minutes),
+        )
+
+        friendly_news_matches = format_news_matches_table(news_matches)
+
+        if friendly_news_matches.empty:
+            st.info(
+                "No related news/events were found near the selected volatility jumps."
+            )
+        else:
+            st.caption(
+                "These events happened near volatility jumps. This does not prove causation."
+            )
+
+            st.dataframe(
+                friendly_news_matches,
+                use_container_width=True,
+            )
 
 
 # ---------------------------------------------------------------------------
