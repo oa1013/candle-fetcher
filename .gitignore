@@ -30,3 +30,8 @@ data/comparisons/tables/*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Volatility jump generated outputs
+data/jumps/tables/*.csv
+data/jumps/reports/*.md
+data/jumps/charts/*.html
