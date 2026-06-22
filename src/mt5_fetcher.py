@@ -64,6 +64,7 @@ class MT5FetchConfig:
     timeframe: str = DEFAULT_TIMEFRAME
 
     range_name: str = "raw"
+    output_name: str | None = None
     start_date: str = "2021-01-01"
     end_date: str = "2021-12-31"
 
@@ -309,6 +310,20 @@ def make_raw_output_filename(
         f"{range_part}_{start_day}_to_{end_day}.csv"
     )
 
+def make_custom_raw_output_filename(output_name: str) -> str:
+    """
+    Build a custom raw CSV filename from user input.
+    """
+
+    clean_name = str(output_name).strip()
+
+    if clean_name.lower().endswith(".csv"):
+        clean_name = clean_name[:-4]
+
+    filename = f"{clean_filename_part(clean_name)}.csv"
+
+    return filename
+
 
 def save_raw_candles_to_csv(
     df: pd.DataFrame,
@@ -369,12 +384,15 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
             "No candles were fetched. Check symbol, MT5 login, and data availability."
         )
 
-    filename = make_raw_output_filename(
-        symbol=config.symbol,
-        timeframe=timeframe_label,
-        range_name=config.range_name,
-        start_day=start_day,
-        end_day=end_day,
+    if config.output_name:
+        filename = make_custom_raw_output_filename(config.output_name)
+    else:
+        filename = make_raw_output_filename(
+            symbol=config.symbol,
+            timeframe=timeframe_label,
+            range_name=config.range_name,
+            start_day=start_day,
+            end_day=end_day,
     )
 
     output_path = save_raw_candles_to_csv(
