@@ -1,6 +1,6 @@
 ﻿# Candle Fetcher
 
-A Python project for fetching MT5 / FTMO candle data, filtering it by trading session, comparing candle CSVs, and finding calm or volatile market regimes.
+A Python project for fetching MT5 / FTMO candle data, filtering it by trading session, comparing candle CSVs, finding calm or volatile market regimes, and detecting volatility jumps.
 
 The project supports:
 
@@ -20,6 +20,10 @@ The project supports:
 * CSV comparison
 * Calm / normal / volatile / extreme CSV labels
 * Calmest or most volatile year, month, week, or day detection
+* Volatility jump detection
+* Volatility jump comparison between CSVs
+* Local news/event matching near volatility jumps
+* Interactive browser dashboard with light, dark, and auto theme modes
 
 ## Project Workflow
 
@@ -53,10 +57,25 @@ notebooks/06_period_regime_finder.ipynb
 calmest / most volatile year, month, week, or day
 ```
 
+The volatility jump workflow is:
+
+```text
+processed CSV
+  ↓
+volatility jump detection
+  ↓
+jump tables / reports / browser dashboard
+  ↓
+optional CSV comparison and news/event matching
+```
+
 ## Folder Structure
 
 ```text
 candle-fetcher/
+│
+├── apps/
+│   └── volatility_jump_app.py
 │
 ├── data/
 │   ├── raw/
@@ -65,9 +84,18 @@ candle-fetcher/
 │   │   ├── london/
 │   │   ├── asia/
 │   │   └── all_sessions/
-│   └── comparisons/
-│       ├── tables/
-│       └── reports/
+│   │
+│   ├── comparisons/
+│   │   ├── tables/
+│   │   └── reports/
+│   │
+│   ├── jumps/
+│   │   ├── tables/
+│   │   ├── reports/
+│   │   └── charts/
+│   │
+│   └── news/
+│       └── market_news_events.example.csv
 │
 ├── notebooks/
 │   ├── 01_new_york_runner.ipynb
@@ -75,7 +103,8 @@ candle-fetcher/
 │   ├── 03_asia_runner.ipynb
 │   ├── 04_all_sessions_runner.ipynb
 │   ├── 05_csv_comparison_runner.ipynb
-│   └── 06_period_regime_finder.ipynb
+│   ├── 06_period_regime_finder.ipynb
+│   └── 07_volatility_jump_runner.ipynb
 │
 ├── src/
 │   ├── __init__.py
@@ -91,6 +120,11 @@ candle-fetcher/
 │   ├── comparison_exports.py
 │   ├── comparison_formatting.py
 │   ├── regime_period_filter.py
+│   ├── volatility_jumps.py
+│   ├── volatility_jump_exports.py
+│   ├── volatility_jump_comparison.py
+│   ├── news_matcher.py
+│   ├── theme_manager.py
 │   └── utils/
 │       ├── file_naming.py
 │       └── timeframes.py
@@ -149,6 +183,47 @@ You can control:
 * regime type: calm or volatile
 * number of results to show
 * custom output names
+
+### `07_volatility_jump_runner.ipynb`
+
+Detects the biggest volatility jumps inside a candle CSV.
+
+The notebook can show:
+
+* top volatility jumps
+* jump scores
+* price move percentages
+* jump regimes
+* user-friendly jump tables
+* saved jump reports
+
+## Browser App
+
+The project includes an interactive browser dashboard:
+
+```text
+apps/volatility_jump_app.py
+```
+
+Run it with:
+
+```bash
+streamlit run apps/volatility_jump_app.py
+```
+
+The browser app supports:
+
+* light mode
+* dark mode
+* auto mode
+* CSV file selection
+* volatility jump detection
+* price chart with detected jump markers
+* rolling jump score chart
+* top volatility jump table
+* CSV jump comparison
+* related news/event matching
+* optional result saving
 
 ## Source Files
 
@@ -251,6 +326,60 @@ It supports:
 * most volatile week
 * most volatile day
 
+### `src/volatility_jumps.py`
+
+Detects volatility jumps inside candle data.
+
+It calculates:
+
+* candle range
+* candle body
+* rolling range baseline
+* rolling ATR-style baseline
+* jump score
+* range-to-baseline ratio
+* price move percentage
+* jump regime
+
+### `src/volatility_jump_exports.py`
+
+Saves volatility jump outputs into:
+
+```text
+data/jumps/tables/
+data/jumps/reports/
+```
+
+It can save:
+
+* top jump tables
+* markdown jump reports
+
+### `src/volatility_jump_comparison.py`
+
+Compares volatility jump behavior between multiple CSV files.
+
+It can compare:
+
+* total rows
+* total jumps
+* jump rate percentage
+* largest jump score
+* average jump score
+* median jump score
+* average price move percentage
+* largest price move percentage
+
+### `src/news_matcher.py`
+
+Matches volatility jumps to nearby local news or event records.
+
+This does not prove causation. It only shows events that happened near the detected jump time.
+
+### `src/theme_manager.py`
+
+Controls light, dark, and auto theme options for the Streamlit browser app.
+
 ### `src/utils/file_naming.py`
 
 Contains helper functions for building cleaner CSV file paths and filenames.
@@ -290,7 +419,21 @@ data/comparisons/tables/
 data/comparisons/reports/
 ```
 
-CSV files are ignored by Git so broker data is not uploaded to GitHub.
+Volatility jump outputs are saved here:
+
+```text
+data/jumps/tables/
+data/jumps/reports/
+data/jumps/charts/
+```
+
+News/event templates are stored here:
+
+```text
+data/news/
+```
+
+CSV files and generated outputs are ignored by Git so broker data and generated analysis files are not uploaded to GitHub.
 
 ## Custom CSV Naming
 
@@ -417,6 +560,93 @@ Supported regimes:
 * calm
 * volatile
 
+## Volatility Jump Runner
+
+The volatility jump runner detects sudden volatility spikes inside candle CSV data.
+
+The notebook runner is:
+
+```text
+notebooks/07_volatility_jump_runner.ipynb
+```
+
+The browser app is:
+
+```text
+apps/volatility_jump_app.py
+```
+
+Run the browser app with:
+
+```bash
+streamlit run apps/volatility_jump_app.py
+```
+
+The browser app can show:
+
+* total rows
+* detected jumps
+* largest jump score
+* average top jump score
+* price chart with jump markers
+* rolling jump score chart
+* top volatility jump table
+* CSV jump comparison table
+* CSV jump comparison chart
+* related news/events table
+
+## Volatility Jump Outputs
+
+Volatility jump outputs are saved into:
+
+```text
+data/jumps/tables/
+data/jumps/reports/
+data/jumps/charts/
+```
+
+Generated jump output files are ignored by Git.
+
+The project keeps the folders using `.gitkeep` files.
+
+## News / Event Matching
+
+The Volatility Jump Runner can match nearby news or events to detected volatility jumps.
+
+The template file is:
+
+```text
+data/news/market_news_events.example.csv
+```
+
+To create a local working news file, copy it:
+
+```powershell
+Copy-Item data/news/market_news_events.example.csv data/news/market_news_events.csv -Force
+```
+
+The local working news file is:
+
+```text
+data/news/market_news_events.csv
+```
+
+This file is for local research and should not be committed.
+
+Expected news/event columns:
+
+```text
+datetime
+headline
+event_type
+importance
+source
+url
+symbol
+```
+
+Important: news matching does not prove that the news caused the jump. It only shows events that happened near the jump time.
+
 ## Important Note About Regimes
 
 The calm, normal, volatile, and extreme labels are relative to the files or periods being compared.
@@ -424,6 +654,8 @@ The calm, normal, volatile, and extreme labels are relative to the files or peri
 For CSV comparison, the tool decides which selected CSVs are calmer or more volatile compared with the other selected CSVs.
 
 For the period regime finder, the tool decides which years, months, weeks, or days are calmer or more volatile compared with the other periods inside the selected candle data.
+
+For volatility jump detection, jump scores are calculated relative to the recent rolling volatility baseline.
 
 ## Requirements
 
@@ -441,6 +673,13 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
+The browser app uses:
+
+```text
+streamlit
+plotly
+```
+
 ## Notes
 
 MetaTrader 5 must be open and logged into the correct FTMO / broker account before running MT5 fetches.
@@ -448,3 +687,5 @@ MetaTrader 5 must be open and logged into the correct FTMO / broker account befo
 The project is designed for research and data preparation.
 
 It does not place trades.
+
+The app and notebooks are for analysis only, not financial advice.
