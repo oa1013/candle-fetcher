@@ -7,6 +7,7 @@ from typing import Iterable
 import pandas as pd
 
 from .loaders import load_candle_csv
+from .comparison_formatting import print_user_friendly_comparison_summary
 from .regime_analysis import (
     add_regime_labels,
     calculate_regime_metrics,
@@ -323,12 +324,5 @@ def compare_two_csvs(
 
 
 def print_comparison_summary(result: dict) -> None:
-    """Print a clean text summary of comparison results."""
-    regime_summary = result["regime_summary"]
-    pairwise = result["pairwise_comparisons"]
-
-    print("Regime Summary")
-    print(regime_summary)
-
-    print("\nPairwise Comparisons")
-    print(pairwise)
+    """Print a user-friendly text summary of comparison results."""
+    print_user_friendly_comparison_summary(result)

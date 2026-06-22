@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from pathlib import Path
+from .comparison_formatting import build_user_friendly_comparison_tables
 
 import pandas as pd
 
@@ -73,8 +74,10 @@ def save_comparison_tables(
     if include_timestamp:
         safe_name = f"{safe_name}_{get_timestamp()}"
 
-    regime_summary = result["regime_summary"]
-    pairwise_comparisons = result["pairwise_comparisons"]
+    friendly_tables = build_user_friendly_comparison_tables(result)
+
+    regime_summary = friendly_tables["regime_summary"]
+    pairwise_comparisons = friendly_tables["pairwise_comparisons"]
     metrics = result["metrics"]
 
     regime_summary_path = save_dataframe(
@@ -125,8 +128,10 @@ def build_comparison_report(
     """
     Build a markdown report from a comparison result.
     """
-    regime_summary = result["regime_summary"]
-    pairwise_comparisons = result["pairwise_comparisons"]
+    friendly_tables = build_user_friendly_comparison_tables(result)
+
+    regime_summary = friendly_tables["regime_summary"]
+    pairwise_comparisons = friendly_tables["pairwise_comparisons"]
 
     report = f"""# {comparison_name}
 
