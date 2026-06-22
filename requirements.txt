@@ -3,3 +3,5 @@ jupyter
 ipykernel
 MetaTrader5
 tabulate
+streamlit
+plotly
