@@ -21,6 +21,13 @@ from src.theme_manager import (
     apply_streamlit_theme,
 )
 
+from src.dashboard_ui import (
+    load_css,
+    render_dashboard_card,
+    render_footer_note,
+    render_page_header,
+)
+
 
 # ---------------------------------------------------------------------------
 # Page setup
@@ -31,6 +38,13 @@ st.set_page_config(
     page_icon="📊",
     layout="wide",
 )
+
+
+# ---------------------------------------------------------------------------
+# Styling
+# ---------------------------------------------------------------------------
+
+load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 
 # ---------------------------------------------------------------------------
@@ -52,39 +66,53 @@ apply_streamlit_theme(theme)
 # Main page
 # ---------------------------------------------------------------------------
 
-st.title("Candle Fetcher Dashboard")
-
-st.caption(
-    "MT5 / FTMO candle research dashboard for session filtering, CSV comparison, "
-    "regime analysis, volatility jumps, and news/event matching."
+render_page_header(
+    title="Candle Fetcher Dashboard",
+    subtitle=(
+        "MT5 / FTMO candle research dashboard for session filtering, "
+        "CSV comparison, regime analysis, volatility jumps, and news/event matching."
+    ),
 )
 
-st.divider()
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.subheader("CSV Comparison")
-    st.write(
-        "Compare processed CSV files and see similarity scores, regime labels, "
-        "and volatility differences."
+    render_dashboard_card(
+        title="CSV Comparison",
+        body=(
+            "Compare processed CSV files and review similarity scores, "
+            "regime labels, volatility differences, and pairwise comparisons."
+        ),
     )
 
 with col2:
-    st.subheader("Period Regime Finder")
-    st.write(
-        "Find the calmest or most volatile year, month, week, or day from candle data."
+    render_dashboard_card(
+        title="Period Regime Finder",
+        body=(
+            "Find the calmest or most volatile year, month, week, or day "
+            "from candle data using volatility metrics."
+        ),
     )
 
 with col3:
-    st.subheader("Volatility Jump Runner")
-    st.write(
-        "Detect volatility jumps, compare CSVs, and match nearby news or events."
+    render_dashboard_card(
+        title="Volatility Jump Runner",
+        body=(
+            "Detect volatility spikes, compare jump profiles between CSVs, "
+            "and match nearby news or market events."
+        ),
     )
 
-st.divider()
 
-st.info(
-    "Use the pages in the sidebar to open each analysis tool. "
-    "The notebooks will stay available for testing and development."
+st.markdown("### Dashboard pages")
+
+st.write(
+    "Use the sidebar pages to open each analysis tool. "
+    "The notebooks are still available as backup/testing runners."
+)
+
+
+render_footer_note(
+    "Research dashboard only. This project does not place trades and is not financial advice."
 )

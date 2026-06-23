@@ -1,0 +1,76 @@
+/* -------------------------------------------------------------------------
+   Candle Fetcher Dashboard Styles
+   ------------------------------------------------------------------------- */
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+    max-width: 1500px;
+}
+
+/* Main page headings */
+h1 {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+}
+
+h2, h3 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+/* Streamlit sidebar spacing */
+section[data-testid="stSidebar"] {
+    border-right: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
+    font-size: 1.15rem;
+}
+
+/* Dashboard cards */
+.dashboard-card {
+    padding: 1.25rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    min-height: 160px;
+}
+
+.dashboard-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.dashboard-card p {
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* Panel style for charts / tables */
+.dashboard-panel {
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(255, 255, 255, 0.75);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    margin-bottom: 1.25rem;
+}
+
+/* Small muted text */
+.dashboard-muted {
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+/* Footer note */
+.dashboard-footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+    color: #64748b;
+    font-size: 0.9rem;
+}
