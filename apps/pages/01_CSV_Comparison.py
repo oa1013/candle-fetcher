@@ -21,6 +21,12 @@ from src.theme_manager import (
     apply_streamlit_theme,
 )
 
+from src.dashboard_ui import (
+    load_css,
+    render_footer_note,
+    render_page_header,
+)
+
 from src.csv_comparison import compare_csv_files
 
 from src.comparison_formatting import (
@@ -40,6 +46,8 @@ st.set_page_config(
     page_icon="📊",
     layout="wide",
 )
+
+load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 
 # ---------------------------------------------------------------------------
@@ -129,11 +137,12 @@ run_analysis = st.sidebar.button(
 # Header
 # ---------------------------------------------------------------------------
 
-st.title("CSV Comparison")
-
-st.caption(
-    "Compare processed candle CSV files and review regimes, similarity scores, "
-    "and pairwise differences."
+render_page_header(
+    title="CSV Comparison",
+    subtitle=(
+        "Compare processed candle CSV files and review regimes, "
+        "similarity scores, and pairwise differences."
+    ),
 )
 
 
@@ -282,3 +291,7 @@ if save_results:
 
     st.success("Comparison results saved.")
     st.write(export_paths)
+
+    render_footer_note(
+    "CSV comparisons are for research only. Similarity scores do not predict future market behavior."
+)

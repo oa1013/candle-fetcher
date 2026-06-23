@@ -21,6 +21,12 @@ from src.theme_manager import (
     apply_streamlit_theme,
 )
 
+from src.dashboard_ui import (
+    load_css,
+    render_footer_note,
+    render_page_header,
+)
+
 from src.regime_period_filter import (
     find_period_regimes_from_csv,
     format_period_regime_table,
@@ -37,6 +43,7 @@ st.set_page_config(
     layout="wide",
 )
 
+load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 # ---------------------------------------------------------------------------
 # Sidebar controls
@@ -104,10 +111,9 @@ run_analysis = st.sidebar.button(
 # Header
 # ---------------------------------------------------------------------------
 
-st.title("Period Regime Finder")
-
-st.caption(
-    "Find the calmest or most volatile year, month, week, or day from a candle CSV."
+render_page_header(
+    title="Period Regime Finder",
+    subtitle="Find the calmest or most volatile year, month, week, or day from a candle CSV.",
 )
 
 
@@ -170,4 +176,8 @@ st.subheader("Ranked period regimes")
 st.dataframe(
     friendly_table,
     use_container_width=True,
+)
+
+render_footer_note(
+    "Period regime results are descriptive research metrics, not trading signals."
 )

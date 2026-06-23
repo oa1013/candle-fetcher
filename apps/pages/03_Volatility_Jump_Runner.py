@@ -18,15 +18,22 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 from src.loaders import load_candle_csv
+
 from src.theme_manager import (
     THEME_OPTIONS,
     apply_streamlit_theme,
     get_plotly_template,
 )
+
 from src.volatility_jumps import (
     detect_volatility_jumps,
     format_volatility_jump_table,
     get_top_volatility_jumps,
+)
+from src.dashboard_ui import (
+    load_css,
+    render_footer_note,
+    render_page_header,
 )
 from src.volatility_jump_exports import save_volatility_jump_result
 from src.volatility_jump_comparison import (
@@ -49,6 +56,7 @@ st.set_page_config(
     layout="wide",
 )
 
+load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 # ---------------------------------------------------------------------------
 # Sidebar controls
@@ -165,10 +173,9 @@ run_analysis = st.sidebar.button(
 # Header
 # ---------------------------------------------------------------------------
 
-st.title("Volatility Jump Runner")
-
-st.caption(
-    "Detect volatility spikes, compare CSVs, and match nearby news or events."
+render_page_header(
+    title="Volatility Jump Runner",
+    subtitle="Detect volatility spikes, compare CSVs, and match nearby news or events.",
 )
 
 
@@ -453,3 +460,8 @@ if save_results:
 
     st.success("Results saved.")
     st.write(export_paths)
+
+
+render_footer_note(
+    "Nearby news/events do not prove causation. Use this page for research and review only."
+)
