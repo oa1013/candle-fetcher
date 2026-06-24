@@ -10,18 +10,18 @@
 
 /* Main page headings */
 h1 {
-    font-weight: 800;
-    letter-spacing: -0.03em;
+    font-weight: 850;
+    letter-spacing: -0.045em;
 }
 
 h2, h3 {
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-weight: 750;
+    letter-spacing: -0.025em;
 }
 
-/* Streamlit sidebar spacing */
+/* Sidebar */
 section[data-testid="stSidebar"] {
-    border-right: 1px solid rgba(148, 163, 184, 0.25);
+    border-right: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
 }
 
 section[data-testid="stSidebar"] h1,
@@ -30,14 +30,58 @@ section[data-testid="stSidebar"] h3 {
     font-size: 1.15rem;
 }
 
+/* Header */
+.dashboard-header {
+    padding: 0.25rem 0 0.25rem 0;
+}
+
+.dashboard-header h1 {
+    margin-bottom: 0.4rem;
+}
+
+.dashboard-header p {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 1.02rem;
+    line-height: 1.65;
+    max-width: 950px;
+}
+
 /* Dashboard cards */
 .dashboard-card {
     padding: 1.25rem;
-    border-radius: 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(255, 255, 255, 0.75);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-    min-height: 160px;
+    border-radius: 1.2rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+    background: var(--dashboard-panel, rgba(255, 255, 255, 0.8));
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+    min-height: 205px;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+    border-color: rgba(56, 189, 248, 0.5);
+}
+
+.dashboard-card-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.85rem;
+    background: rgba(56, 189, 248, 0.12);
+    font-size: 1.25rem;
+    margin-bottom: 0.85rem;
+}
+
+.dashboard-card-eyebrow {
+    color: var(--dashboard-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
 }
 
 .dashboard-card h3 {
@@ -46,23 +90,55 @@ section[data-testid="stSidebar"] h3 {
 }
 
 .dashboard-card p {
-    color: #64748b;
-    line-height: 1.6;
+    color: var(--dashboard-muted, #64748b);
+    line-height: 1.65;
+    margin-bottom: 0;
+}
+
+/* Status cards */
+.dashboard-status-card {
+    padding: 1rem;
+    border-radius: 1rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+    background: var(--dashboard-panel, rgba(255, 255, 255, 0.8));
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+    min-height: 120px;
+}
+
+.dashboard-status-label {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.35rem;
+}
+
+.dashboard-status-value {
+    font-size: 1.35rem;
+    font-weight: 850;
+    margin-bottom: 0.25rem;
+}
+
+.dashboard-status-note {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.9rem;
+    line-height: 1.45;
 }
 
 /* Panel style for charts / tables */
 .dashboard-panel {
     padding: 1rem;
     border-radius: 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+    background: var(--dashboard-panel, rgba(255, 255, 255, 0.8));
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
     margin-bottom: 1.25rem;
 }
 
 /* Small muted text */
 .dashboard-muted {
-    color: #64748b;
+    color: var(--dashboard-muted, #64748b);
     font-size: 0.95rem;
 }
 
@@ -70,7 +146,8 @@ section[data-testid="stSidebar"] h3 {
 .dashboard-footer {
     margin-top: 2rem;
     padding-top: 1rem;
-    border-top: 1px solid rgba(148, 163, 184, 0.25);
-    color: #64748b;
+    border-top: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+    color: var(--dashboard-muted, #64748b);
     font-size: 0.9rem;
+    line-height: 1.5;
 }

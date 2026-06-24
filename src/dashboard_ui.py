@@ -26,16 +26,46 @@ def load_css(css_path: str | Path) -> None:
 def render_dashboard_card(
     title: str,
     body: str,
+    icon: str = "📊",
+    eyebrow: str | None = None,
 ) -> None:
     """
     Render a reusable dashboard card.
     """
 
+    eyebrow_html = ""
+
+    if eyebrow:
+        eyebrow_html = f'<div class="dashboard-card-eyebrow">{eyebrow}</div>'
+
     st.markdown(
         f"""
         <div class="dashboard-card">
+            <div class="dashboard-card-icon">{icon}</div>
+            {eyebrow_html}
             <h3>{title}</h3>
             <p>{body}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_status_card(
+    label: str,
+    value: str,
+    note: str,
+) -> None:
+    """
+    Render a small dashboard status card.
+    """
+
+    st.markdown(
+        f"""
+        <div class="dashboard-status-card">
+            <div class="dashboard-status-label">{label}</div>
+            <div class="dashboard-status-value">{value}</div>
+            <div class="dashboard-status-note">{note}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -50,11 +80,16 @@ def render_page_header(
     Render a cleaner page header.
     """
 
-    st.title(title)
     st.markdown(
-        f'<p class="dashboard-muted">{subtitle}</p>',
+        f"""
+        <div class="dashboard-header">
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
+
     st.divider()
 
 

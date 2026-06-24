@@ -26,8 +26,8 @@ from src.dashboard_ui import (
     render_dashboard_card,
     render_footer_note,
     render_page_header,
+    render_status_card,
 )
-
 
 # ---------------------------------------------------------------------------
 # Page setup
@@ -70,15 +70,19 @@ render_page_header(
 )
 
 
+st.markdown("### Analysis tools")
+
 col1, col2, col3 = st.columns(3)
 
 with col1:
     render_dashboard_card(
         title="CSV Comparison",
         body=(
-            "Compare processed CSV files and review similarity scores, "
+            "Compare processed candle CSV files and review similarity scores, "
             "regime labels, volatility differences, and pairwise comparisons."
         ),
+        icon="📊",
+        eyebrow="Compare",
     )
 
 with col2:
@@ -88,6 +92,8 @@ with col2:
             "Find the calmest or most volatile year, month, week, or day "
             "from candle data using volatility metrics."
         ),
+        icon="📆",
+        eyebrow="Regimes",
     )
 
 with col3:
@@ -97,14 +103,42 @@ with col3:
             "Detect volatility spikes, compare jump profiles between CSVs, "
             "and match nearby news or market events."
         ),
+        icon="📈",
+        eyebrow="Jumps",
     )
 
 
-st.markdown("### Dashboard pages")
+st.markdown("### Project status")
+
+status_col1, status_col2, status_col3 = st.columns(3)
+
+with status_col1:
+    render_status_card(
+        label="Dashboard",
+        value="Active",
+        note="Main interface for analysis tools.",
+    )
+
+with status_col2:
+    render_status_card(
+        label="Notebooks",
+        value="Backup",
+        note="Still available for testing and development.",
+    )
+
+with status_col3:
+    render_status_card(
+        label="Trading",
+        value="Research only",
+        note="No trades are placed by this project.",
+    )
+
+
+st.markdown("### How to use")
 
 st.write(
     "Use the sidebar pages to open each analysis tool. "
-    "The notebooks are still available as backup/testing runners."
+    "Choose a theme once and it will stay the same across the dashboard."
 )
 
 
