@@ -35,7 +35,8 @@ from src.dashboard_ui import (
     load_css,
     render_dataframe_download_button,
     render_footer_note,
-    render_page_header,
+    render_mockup_kpi_card,
+    render_mockup_panel_header,
 )
 
 from src.volatility_jump_exports import save_volatility_jump_result
@@ -174,10 +175,24 @@ run_analysis = st.sidebar.button(
 # Header
 # ---------------------------------------------------------------------------
 
-render_page_header(
-    title="Volatility Jump Runner",
-    subtitle="Detect volatility spikes, compare CSVs, and match nearby news or events.",
+st.markdown(
+    """
+    <div class="mockup-topbar">
+        <div>
+            <div class="mockup-topbar-title">Volatility Jump Runner</div>
+            <div class="mockup-topbar-subtitle">
+                Detect volatility spikes, compare CSVs, and review related news.
+            </div>
+        </div>
+        <div class="mockup-topbar-actions">
+            <span>Last run: dashboard session</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
+
+st.divider()
 
 
 # ---------------------------------------------------------------------------
@@ -241,19 +256,51 @@ else:
 # KPI cards
 # ---------------------------------------------------------------------------
 
-col1, col2, col3, col4 = st.columns(4)
+kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns(4)
 
-col1.metric("Total rows", f"{total_rows:,}")
-col2.metric("Detected jumps", f"{total_jumps:,}")
-col3.metric("Largest jump score", f"{largest_jump_score:.2f}")
-col4.metric("Avg top jump score", f"{average_jump_score:.2f}")
+with kpi_col1:
+    render_mockup_kpi_card(
+        title="Total Jumps",
+        value=f"{total_jumps:,}",
+        note=f"Above threshold {float(jump_threshold):.2f}",
+        icon="⚡",
+    )
+
+with kpi_col2:
+    render_mockup_kpi_card(
+        title="Largest Jump Score",
+        value=f"{largest_jump_score:.2f}",
+        note="Highest jump score detected",
+        icon="📈",
+    )
+
+with kpi_col3:
+    render_mockup_kpi_card(
+        title="Avg Top Jump Score",
+        value=f"{average_jump_score:.2f}",
+        note=f"Average of top {int(top_n)} jumps",
+        icon="📊",
+    )
+
+with kpi_col4:
+    render_mockup_kpi_card(
+        title="Total Rows",
+        value=f"{total_rows:,}",
+        note="Candles analyzed",
+        icon="🧮",
+    )
 
 
 # ---------------------------------------------------------------------------
 # Price chart
 # ---------------------------------------------------------------------------
 
-st.subheader("Price chart with detected jumps")
+st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+render_mockup_panel_header(
+    title="Price Chart with Detected Jumps",
+    subtitle="Close price with detected volatility jump markers.",
+)
 
 jump_points = scored_df[scored_df["is_jump"]].copy()
 
@@ -289,12 +336,19 @@ price_fig.update_layout(
 
 st.plotly_chart(price_fig, use_container_width=True)
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # Jump score chart
 # ---------------------------------------------------------------------------
 
-st.subheader("Rolling volatility and jump score")
+st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+render_mockup_panel_header(
+    title="Rolling Volatility and Jump Score",
+    subtitle="Jump score compared against the selected threshold.",
+)
 
 jump_score_fig = go.Figure()
 
@@ -323,12 +377,19 @@ jump_score_fig.update_layout(
 
 st.plotly_chart(jump_score_fig, use_container_width=True)
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # Top jumps table
 # ---------------------------------------------------------------------------
 
-st.subheader("Top volatility jumps")
+st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+render_mockup_panel_header(
+    title="Top Volatility Jumps",
+    subtitle=f"Top {int(top_n)} detected jumps ranked by jump score.",
+)
 
 friendly_jumps = format_volatility_jump_table(top_jumps)
 
@@ -344,13 +405,20 @@ render_dataframe_download_button(
     key="download_top_jumps",
 )
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # CSV comparison
 # ---------------------------------------------------------------------------
 
 if compare_csvs:
-    st.subheader("CSV jump comparison")
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+    render_mockup_panel_header(
+        title="CSV Jump Comparison",
+        subtitle="Compare volatility jump behavior between selected CSV files.",
+    )
 
     with st.spinner("Comparing CSV jump profiles..."):
         comparison_df = compare_jump_profiles(
@@ -419,13 +487,20 @@ if compare_csvs:
         use_container_width=True,
     )
 
+    st.markdown("</div>", unsafe_allow_html=True)
+
 
 # ---------------------------------------------------------------------------
 # Related news/events
 # ---------------------------------------------------------------------------
 
 if show_related_news:
-    st.subheader("Related news / events")
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+    render_mockup_panel_header(
+        title="Related News / Events",
+        subtitle=f"Nearby events within ±{int(news_window_minutes)} minutes of detected jumps.",
+    )
 
     news_path = Path(news_path_input)
 
@@ -467,6 +542,8 @@ if show_related_news:
                 label="Download news matches CSV",
                 key="download_news_matches",
             )
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------

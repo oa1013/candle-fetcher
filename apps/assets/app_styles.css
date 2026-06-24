@@ -151,3 +151,174 @@ section[data-testid="stSidebar"] h3 {
     font-size: 0.9rem;
     line-height: 1.5;
 }
+
+/* -------------------------------------------------------------------------
+   Mockup-style Volatility Jump Runner UI
+   ------------------------------------------------------------------------- */
+
+.mockup-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.mockup-topbar-title {
+    font-size: 1.65rem;
+    font-weight: 850;
+    letter-spacing: -0.04em;
+    margin-bottom: 0.2rem;
+}
+
+.mockup-topbar-subtitle {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.92rem;
+}
+
+.mockup-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.85rem;
+}
+
+.mockup-kpi-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.28));
+    border-radius: 1rem;
+    background: var(--dashboard-panel, #ffffff);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    min-height: 110px;
+}
+
+.mockup-kpi-title {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: var(--dashboard-muted, #64748b);
+    margin-bottom: 0.25rem;
+}
+
+.mockup-kpi-value {
+    font-size: 1.75rem;
+    font-weight: 900;
+    line-height: 1.05;
+}
+
+.mockup-kpi-note {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.82rem;
+    margin-top: 0.4rem;
+}
+
+.mockup-kpi-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+    font-size: 1.35rem;
+    flex: 0 0 auto;
+}
+
+.mockup-panel {
+    padding: 1rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.28));
+    border-radius: 1rem;
+    background: var(--dashboard-panel, #ffffff);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+    margin-bottom: 1rem;
+}
+
+.mockup-panel-header {
+    margin-bottom: 0.75rem;
+}
+
+.mockup-panel-title {
+    font-size: 0.98rem;
+    font-weight: 850;
+    letter-spacing: -0.02em;
+}
+
+.mockup-panel-subtitle {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.82rem;
+    margin-top: 0.15rem;
+}
+
+.mockup-news-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.75rem;
+    align-items: start;
+    padding: 0.75rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.2));
+    border-radius: 0.85rem;
+    margin-bottom: 0.65rem;
+    background: rgba(255, 255, 255, 0.38);
+}
+
+.mockup-news-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #dc2626;
+    margin-top: 0.35rem;
+}
+
+.mockup-news-title {
+    font-weight: 850;
+    font-size: 0.86rem;
+    margin-bottom: 0.15rem;
+}
+
+.mockup-news-description {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.mockup-news-meta {
+    text-align: right;
+    min-width: 115px;
+}
+
+.mockup-news-time {
+    color: #2563eb;
+    font-size: 0.72rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+}
+
+.mockup-impact-high,
+.mockup-impact-medium {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.68rem;
+    font-weight: 850;
+}
+
+.mockup-impact-high {
+    color: #dc2626;
+    background: rgba(220, 38, 38, 0.09);
+}
+
+.mockup-impact-medium {
+    color: #d97706;
+    background: rgba(217, 119, 6, 0.11);
+}
+
+.mockup-table-note {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.82rem;
+    margin-bottom: 0.5rem;
+}

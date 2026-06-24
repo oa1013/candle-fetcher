@@ -102,6 +102,8 @@ def render_footer_note(text: str) -> None:
         f'<div class="dashboard-footer">{text}</div>',
         unsafe_allow_html=True,
     )
+
+
 def render_dataframe_download_button(
     df,
     filename: str,
@@ -120,4 +122,86 @@ def render_dataframe_download_button(
         file_name=filename,
         mime="text/csv",
         key=key,
+    )
+
+
+def render_mockup_kpi_card(
+    title: str,
+    value: str,
+    note: str,
+    icon: str = "📊",
+) -> None:
+    """
+    Render a polished KPI card for dashboard pages.
+    """
+
+    st.markdown(
+        f"""
+        <div class="mockup-kpi-card">
+            <div>
+                <div class="mockup-kpi-title">{title}</div>
+                <div class="mockup-kpi-value">{value}</div>
+                <div class="mockup-kpi-note">{note}</div>
+            </div>
+            <div class="mockup-kpi-icon">{icon}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mockup_panel_header(
+    title: str,
+    subtitle: str | None = None,
+) -> None:
+    """
+    Render a panel header that matches the dashboard mockup style.
+    """
+
+    subtitle_html = ""
+
+    if subtitle:
+        subtitle_html = f'<div class="mockup-panel-subtitle">{subtitle}</div>'
+
+    st.markdown(
+        f"""
+        <div class="mockup-panel-header">
+            <div class="mockup-panel-title">{title}</div>
+            {subtitle_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mockup_news_item(
+    title: str,
+    description: str,
+    timestamp: str,
+    impact: str,
+) -> None:
+    """
+    Render a compact related news/event item.
+    """
+
+    impact_class = "mockup-impact-medium"
+
+    if impact.lower().startswith("high"):
+        impact_class = "mockup-impact-high"
+
+    st.markdown(
+        f"""
+        <div class="mockup-news-item">
+            <div class="mockup-news-dot"></div>
+            <div class="mockup-news-content">
+                <div class="mockup-news-title">{title}</div>
+                <div class="mockup-news-description">{description}</div>
+            </div>
+            <div class="mockup-news-meta">
+                <div class="mockup-news-time">{timestamp}</div>
+                <div class="{impact_class}">{impact}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
