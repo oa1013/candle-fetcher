@@ -75,7 +75,15 @@ optional CSV comparison and news/event matching
 candle-fetcher/
 │
 ├── apps/
-│   └── volatility_jump_app.py
+│   ├── candle_dashboard_app.py
+│   ├── volatility_jump_app.py
+│   ├── assets/
+│   │   └── app_styles.css
+│   └── pages/
+│       ├── 01_CSV_Comparison.py
+│       ├── 02_Period_Regime_Finder.py
+│       ├── 03_Volatility_Jump_Runner.py
+│       └── 04_News_Events.py
 │
 ├── data/
 │   ├── raw/
@@ -125,6 +133,7 @@ candle-fetcher/
 │   ├── volatility_jump_comparison.py
 │   ├── news_matcher.py
 │   ├── theme_manager.py
+│   ├── dashboard_ui.py
 │   └── utils/
 │       ├── file_naming.py
 │       └── timeframes.py
@@ -197,9 +206,46 @@ The notebook can show:
 * user-friendly jump tables
 * saved jump reports
 
-## Browser App
+## Dashboard
 
-The project includes an interactive browser dashboard:
+The project includes a Streamlit dashboard for running the main candle research tools from one interface:
+
+```text
+apps/candle_dashboard_app.py
+```
+
+Run the dashboard with:
+
+```bash
+streamlit run apps/candle_dashboard_app.py
+```
+
+Dashboard pages:
+
+* **CSV Comparison**  
+  Compare processed candle CSV files, review regime labels, similarity scores, pairwise differences, and download comparison tables.
+
+* **Period Regime Finder**  
+  Find the calmest or most volatile year, month, week, or day from candle data and download the ranked period table.
+
+* **Volatility Jump Runner**  
+  Detect volatility jumps, compare jump profiles, match nearby news or event data, and download jump tables.
+
+* **News / Events**  
+  View, upload, search, and download news/event CSV files used for volatility jump context.
+
+The dashboard supports:
+
+* light mode
+* dark mode
+* auto mode
+* consistent theme selection across every dashboard page
+* styled sidebar and dashboard cards
+* CSV download buttons for dashboard results
+
+The notebooks are still kept as backup/testing runners, but the dashboard is now the main interface for regular analysis.
+
+The older standalone volatility jump app is still available here:
 
 ```text
 apps/volatility_jump_app.py
@@ -210,20 +256,6 @@ Run it with:
 ```bash
 streamlit run apps/volatility_jump_app.py
 ```
-
-The browser app supports:
-
-* light mode
-* dark mode
-* auto mode
-* CSV file selection
-* volatility jump detection
-* price chart with detected jump markers
-* rolling jump score chart
-* top volatility jump table
-* CSV jump comparison
-* related news/event matching
-* optional result saving
 
 ## Source Files
 
@@ -378,7 +410,18 @@ This does not prove causation. It only shows events that happened near the detec
 
 ### `src/theme_manager.py`
 
-Controls light, dark, and auto theme options for the Streamlit browser app.
+Controls light, dark, and auto theme options for the Streamlit dashboard.
+
+### `src/dashboard_ui.py`
+
+Provides reusable Streamlit dashboard UI helpers, including:
+
+* shared CSS loading
+* dashboard cards
+* status cards
+* page headers
+* footer notes
+* CSV download buttons
 
 ### `src/utils/file_naming.py`
 
@@ -570,19 +613,19 @@ The notebook runner is:
 notebooks/07_volatility_jump_runner.ipynb
 ```
 
-The browser app is:
+The main dashboard page is:
 
 ```text
-apps/volatility_jump_app.py
+apps/pages/03_Volatility_Jump_Runner.py
 ```
 
-Run the browser app with:
+Run it through the dashboard with:
 
 ```bash
-streamlit run apps/volatility_jump_app.py
+streamlit run apps/candle_dashboard_app.py
 ```
 
-The browser app can show:
+The dashboard page can show:
 
 * total rows
 * detected jumps
@@ -594,6 +637,7 @@ The browser app can show:
 * CSV jump comparison table
 * CSV jump comparison chart
 * related news/events table
+* CSV download buttons for jump results, comparisons, and news matches
 
 ## Volatility Jump Outputs
 
@@ -647,6 +691,28 @@ symbol
 
 Important: news matching does not prove that the news caused the jump. It only shows events that happened near the jump time.
 
+## News / Events Dashboard Page
+
+The dashboard includes a dedicated News / Events page:
+
+```text
+apps/pages/04_News_Events.py
+```
+
+This page can:
+
+* load the local news/events CSV
+* fall back to the example news/events CSV if the local file is missing
+* upload a replacement news/events CSV
+* search event rows
+* download the filtered news/events table
+
+Run it through the main dashboard:
+
+```bash
+streamlit run apps/candle_dashboard_app.py
+```
+
 ## Important Note About Regimes
 
 The calm, normal, volatile, and extreme labels are relative to the files or periods being compared.
@@ -673,7 +739,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-The browser app uses:
+The dashboard uses:
 
 ```text
 streamlit
