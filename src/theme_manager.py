@@ -25,6 +25,31 @@ def render_theme_selector(label: str = "Theme") -> str:
     """
     Render one shared theme selector.
 
+    The selected theme is stored globally so it stays the same while moving
+    between dashboard pages.
+    """
+
+    initialize_theme_state()
+
+    current_theme = st.session_state.get(THEME_SESSION_KEY, "Auto")
+
+    if current_theme not in THEME_OPTIONS:
+        current_theme = "Auto"
+        st.session_state[THEME_SESSION_KEY] = current_theme
+
+    selected_theme = st.sidebar.selectbox(
+        label,
+        THEME_OPTIONS,
+        index=THEME_OPTIONS.index(current_theme),
+        key="theme_selector_widget",
+    )
+
+    st.session_state[THEME_SESSION_KEY] = selected_theme
+
+    return selected_theme
+    """
+    Render one shared theme selector.
+
     Because every page uses the same session_state key, the selected theme
     stays the same while moving between dashboard pages.
     """

@@ -20,9 +20,9 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.loaders import load_candle_csv
 
 from src.theme_manager import (
-    THEME_OPTIONS,
     apply_streamlit_theme,
     get_plotly_template,
+    render_theme_selector,
 )
 
 from src.volatility_jumps import (
@@ -64,12 +64,7 @@ load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 st.sidebar.title("Volatility Jump Settings")
 
-theme = st.sidebar.selectbox(
-    "Theme",
-    THEME_OPTIONS,
-    index=0,
-)
-
+theme = render_theme_selector()
 apply_streamlit_theme(theme)
 plotly_template = get_plotly_template(theme)
 

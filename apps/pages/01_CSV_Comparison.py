@@ -17,8 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 from src.theme_manager import (
-    THEME_OPTIONS,
     apply_streamlit_theme,
+    render_theme_selector,
 )
 
 from src.dashboard_ui import (
@@ -56,12 +56,7 @@ load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 st.sidebar.title("CSV Comparison Settings")
 
-theme = st.sidebar.selectbox(
-    "Theme",
-    THEME_OPTIONS,
-    index=0,
-)
-
+theme = render_theme_selector()
 apply_streamlit_theme(theme)
 
 
@@ -292,6 +287,7 @@ if save_results:
     st.success("Comparison results saved.")
     st.write(export_paths)
 
-    render_footer_note(
+
+render_footer_note(
     "CSV comparisons are for research only. Similarity scores do not predict future market behavior."
 )

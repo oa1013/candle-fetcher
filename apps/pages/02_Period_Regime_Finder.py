@@ -17,8 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 
 from src.theme_manager import (
-    THEME_OPTIONS,
     apply_streamlit_theme,
+    render_theme_selector,
 )
 
 from src.dashboard_ui import (
@@ -51,12 +51,7 @@ load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 
 st.sidebar.title("Period Regime Settings")
 
-theme = st.sidebar.selectbox(
-    "Theme",
-    THEME_OPTIONS,
-    index=0,
-)
-
+theme = render_theme_selector()
 apply_streamlit_theme(theme)
 
 
