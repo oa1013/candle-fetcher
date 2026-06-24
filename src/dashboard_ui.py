@@ -102,3 +102,22 @@ def render_footer_note(text: str) -> None:
         f'<div class="dashboard-footer">{text}</div>',
         unsafe_allow_html=True,
     )
+def render_dataframe_download_button(
+    df,
+    filename: str,
+    label: str = "Download CSV",
+    key: str | None = None,
+) -> None:
+    """
+    Render a Streamlit CSV download button for a dataframe.
+    """
+
+    csv_data = df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label=label,
+        data=csv_data,
+        file_name=filename,
+        mime="text/csv",
+        key=key,
+    )

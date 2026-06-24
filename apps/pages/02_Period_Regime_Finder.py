@@ -23,6 +23,7 @@ from src.theme_manager import (
 
 from src.dashboard_ui import (
     load_css,
+    render_dataframe_download_button,
     render_footer_note,
     render_page_header,
 )
@@ -171,6 +172,13 @@ st.subheader("Ranked period regimes")
 st.dataframe(
     friendly_table,
     use_container_width=True,
+)
+
+render_dataframe_download_button(
+    df=friendly_table,
+    filename=f"period_regime_{period}_{regime}_top_{int(top_n)}.csv",
+    label="Download period regime CSV",
+    key="download_period_regime",
 )
 
 render_footer_note(

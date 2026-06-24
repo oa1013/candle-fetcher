@@ -30,16 +30,21 @@ from src.volatility_jumps import (
     format_volatility_jump_table,
     get_top_volatility_jumps,
 )
+
 from src.dashboard_ui import (
     load_css,
+    render_dataframe_download_button,
     render_footer_note,
     render_page_header,
 )
+
 from src.volatility_jump_exports import save_volatility_jump_result
+
 from src.volatility_jump_comparison import (
     compare_jump_profiles,
     format_jump_profile_comparison,
 )
+
 from src.news_matcher import (
     match_news_to_jumps_from_csv,
     format_news_matches_table,
@@ -57,6 +62,7 @@ st.set_page_config(
 )
 
 load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
+
 
 # ---------------------------------------------------------------------------
 # Sidebar controls
@@ -331,6 +337,13 @@ st.dataframe(
     use_container_width=True,
 )
 
+render_dataframe_download_button(
+    df=friendly_jumps,
+    filename=f"{analysis_name}_top_volatility_jumps.csv",
+    label="Download top jumps CSV",
+    key="download_top_jumps",
+)
+
 
 # ---------------------------------------------------------------------------
 # CSV comparison
@@ -358,6 +371,13 @@ if compare_csvs:
     st.dataframe(
         friendly_comparison,
         use_container_width=True,
+    )
+
+    render_dataframe_download_button(
+        df=friendly_comparison,
+        filename=f"{analysis_name}_jump_comparison.csv",
+        label="Download jump comparison CSV",
+        key="download_jump_comparison",
     )
 
     comparison_metric = st.selectbox(
@@ -439,6 +459,13 @@ if show_related_news:
             st.dataframe(
                 friendly_news_matches,
                 use_container_width=True,
+            )
+
+            render_dataframe_download_button(
+                df=friendly_news_matches,
+                filename=f"{analysis_name}_news_matches.csv",
+                label="Download news matches CSV",
+                key="download_news_matches",
             )
 
 

@@ -23,6 +23,7 @@ from src.theme_manager import (
 
 from src.dashboard_ui import (
     load_css,
+    render_dataframe_download_button,
     render_footer_note,
     render_page_header,
 )
@@ -256,6 +257,12 @@ st.dataframe(
     use_container_width=True,
 )
 
+render_dataframe_download_button(
+    df=regime_summary,
+    filename=f"{comparison_name}_regime_summary.csv",
+    label="Download regime summary CSV",
+    key="download_regime_summary",
+)
 
 # ---------------------------------------------------------------------------
 # Pairwise table
@@ -270,6 +277,13 @@ st.caption(
 st.dataframe(
     pairwise_comparisons,
     use_container_width=True,
+)
+
+render_dataframe_download_button(
+    df=pairwise_comparisons,
+    filename=f"{comparison_name}_pairwise_comparisons.csv",
+    label="Download pairwise comparisons CSV",
+    key="download_pairwise_comparisons",
 )
 
 
