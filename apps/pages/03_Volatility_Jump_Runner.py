@@ -102,7 +102,7 @@ csv_path_input = st.sidebar.text_input(
 
 compare_csvs = st.sidebar.checkbox(
     "Compare with another CSV",
-    value=False,
+    value=True,
 )
 
 compare_csv_path_input = st.sidebar.text_input(
@@ -113,7 +113,7 @@ compare_csv_path_input = st.sidebar.text_input(
 
 show_related_news = st.sidebar.checkbox(
     "Show related news/events",
-    value=False,
+    value=True,
 )
 
 news_path_input = st.sidebar.text_input(
@@ -168,6 +168,7 @@ save_results = st.sidebar.checkbox(
 run_analysis = st.sidebar.button(
     "Run Analysis",
     type="primary",
+    use_container_width=True,
 )
 
 
@@ -186,6 +187,8 @@ st.markdown(
         </div>
         <div class="mockup-topbar-actions">
             <span>Last run: dashboard session</span>
+            <span>↻</span>
+            <span>Export-ready</span>
         </div>
     </div>
     """,
@@ -292,96 +295,257 @@ with kpi_col4:
 
 
 # ---------------------------------------------------------------------------
-# Price chart
+# Main mockup layout
 # ---------------------------------------------------------------------------
 
-st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+left_col, right_col = st.columns([2.1, 1])
 
-render_mockup_panel_header(
-    title="Price Chart with Detected Jumps",
-    subtitle="Close price with detected volatility jump markers.",
-)
 
-jump_points = scored_df[scored_df["is_jump"]].copy()
+# ---------------------------------------------------------------------------
+# Left column: price chart and jump score chart
+# ---------------------------------------------------------------------------
 
-price_fig = go.Figure()
+with left_col:
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
 
-price_fig.add_trace(
-    go.Scatter(
-        x=scored_df["datetime"],
-        y=scored_df["close"],
-        mode="lines",
-        name="Close price",
+    render_mockup_panel_header(
+        title="Price Chart with Detected Jumps",
+        subtitle="Close price with detected volatility jump markers.",
     )
-)
 
-if not jump_points.empty:
+    jump_points = scored_df[scored_df["is_jump"]].copy()
+
+    price_fig = go.Figure()
+
     price_fig.add_trace(
         go.Scatter(
-            x=jump_points["datetime"],
-            y=jump_points["close"],
-            mode="markers",
-            name="Detected jumps",
-            marker=dict(size=7),
+            x=scored_df["datetime"],
+            y=scored_df["close"],
+            mode="lines",
+            name="Close price",
         )
     )
 
-price_fig.update_layout(
-    template=plotly_template,
-    height=450,
-    margin=dict(l=20, r=20, t=40, b=20),
-    xaxis_title="Datetime",
-    yaxis_title="Close price",
-)
+    if not jump_points.empty:
+        price_fig.add_trace(
+            go.Scatter(
+                x=jump_points["datetime"],
+                y=jump_points["close"],
+                mode="markers",
+                name="Detected jumps",
+                marker=dict(size=7),
+            )
+        )
 
-st.plotly_chart(price_fig, use_container_width=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Jump score chart
-# ---------------------------------------------------------------------------
-
-st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
-
-render_mockup_panel_header(
-    title="Rolling Volatility and Jump Score",
-    subtitle="Jump score compared against the selected threshold.",
-)
-
-jump_score_fig = go.Figure()
-
-jump_score_fig.add_trace(
-    go.Scatter(
-        x=scored_df["datetime"],
-        y=scored_df["jump_score"],
-        mode="lines",
-        name="Jump score",
+    price_fig.update_layout(
+        template=plotly_template,
+        height=430,
+        margin=dict(l=20, r=20, t=25, b=20),
+        xaxis_title="Datetime",
+        yaxis_title="Close price",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
     )
-)
 
-jump_score_fig.add_hline(
-    y=float(jump_threshold),
-    line_dash="dash",
-    annotation_text=f"Threshold: {jump_threshold}",
-)
+    st.plotly_chart(price_fig, use_container_width=True)
 
-jump_score_fig.update_layout(
-    template=plotly_template,
-    height=350,
-    margin=dict(l=20, r=20, t=40, b=20),
-    xaxis_title="Datetime",
-    yaxis_title="Jump score",
-)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.plotly_chart(jump_score_fig, use_container_width=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+    render_mockup_panel_header(
+        title="Rolling Volatility and Jump Score",
+        subtitle="Jump score compared against the selected threshold.",
+    )
+
+    jump_score_fig = go.Figure()
+
+    jump_score_fig.add_trace(
+        go.Scatter(
+            x=scored_df["datetime"],
+            y=scored_df["jump_score"],
+            mode="lines",
+            name="Jump score",
+        )
+    )
+
+    jump_score_fig.add_hline(
+        y=float(jump_threshold),
+        line_dash="dash",
+        annotation_text=f"Threshold: {jump_threshold}",
+    )
+
+    jump_score_fig.update_layout(
+        template=plotly_template,
+        height=260,
+        margin=dict(l=20, r=20, t=25, b=20),
+        xaxis_title="Datetime",
+        yaxis_title="Jump score",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
+    )
+
+    st.plotly_chart(jump_score_fig, use_container_width=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
-# Top jumps table
+# Right column: CSV comparison and news/events
+# ---------------------------------------------------------------------------
+
+with right_col:
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+    render_mockup_panel_header(
+        title="CSV Jump Comparison",
+        subtitle="Compare volatility jump behavior between selected CSV files.",
+    )
+
+    if compare_csvs:
+        with st.spinner("Comparing CSV jump profiles..."):
+            comparison_df = compare_jump_profiles(
+                csv_paths=[
+                    csv_path,
+                    compare_csv_path,
+                ],
+                labels=[
+                    csv_path.stem,
+                    compare_csv_path.stem,
+                ],
+                rolling_window=int(rolling_window),
+                threshold=float(jump_threshold),
+            )
+
+        friendly_comparison = format_jump_profile_comparison(comparison_df)
+
+        comparison_metric = st.selectbox(
+            "Comparison chart metric",
+            [
+                "total_jumps",
+                "jump_rate_pct",
+                "largest_jump_score",
+                "avg_jump_score",
+            ],
+            format_func={
+                "total_jumps": "Total jumps",
+                "jump_rate_pct": "Jump rate %",
+                "largest_jump_score": "Largest jump score",
+                "avg_jump_score": "Average jump score",
+            }.get,
+        )
+
+        comparison_chart = go.Figure()
+
+        comparison_chart.add_trace(
+            go.Bar(
+                x=comparison_df["label"],
+                y=comparison_df[comparison_metric],
+                name=comparison_metric,
+            )
+        )
+
+        comparison_chart.update_layout(
+            template=plotly_template,
+            height=300,
+            margin=dict(l=20, r=20, t=25, b=20),
+            xaxis_title="CSV",
+            yaxis_title=comparison_metric,
+        )
+
+        st.plotly_chart(
+            comparison_chart,
+            use_container_width=True,
+        )
+
+        st.dataframe(
+            friendly_comparison,
+            use_container_width=True,
+            height=180,
+        )
+
+        render_dataframe_download_button(
+            df=friendly_comparison,
+            filename=f"{analysis_name}_jump_comparison.csv",
+            label="Download jump comparison CSV",
+            key="download_jump_comparison",
+        )
+
+    else:
+        st.info("Turn on **Compare with another CSV** in the sidebar to show this panel.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
+
+    render_mockup_panel_header(
+        title="Related News / Events",
+        subtitle=f"Nearby events within ±{int(news_window_minutes)} minutes of detected jumps.",
+    )
+
+    if show_related_news:
+        news_path = Path(news_path_input)
+
+        if not news_path.is_absolute():
+            news_path = PROJECT_ROOT / news_path
+
+        if not news_path.exists():
+            st.warning(
+                f"News/events CSV was not found: {news_path}. "
+                "Create this file later to match news to volatility jumps."
+            )
+
+        else:
+            news_matches = match_news_to_jumps_from_csv(
+                jump_df=top_jumps,
+                news_path=news_path,
+                window_minutes=int(news_window_minutes),
+            )
+
+            friendly_news_matches = format_news_matches_table(news_matches)
+
+            if friendly_news_matches.empty:
+                st.info(
+                    "No related news/events were found near the selected volatility jumps."
+                )
+            else:
+                st.caption(
+                    "These events happened near volatility jumps. This does not prove causation."
+                )
+
+                st.dataframe(
+                    friendly_news_matches,
+                    use_container_width=True,
+                    height=260,
+                )
+
+                render_dataframe_download_button(
+                    df=friendly_news_matches,
+                    filename=f"{analysis_name}_news_matches.csv",
+                    label="Download news matches CSV",
+                    key="download_news_matches",
+                )
+
+    else:
+        st.info("Turn on **Show related news/events** in the sidebar to show this panel.")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# Bottom: top jumps table
 # ---------------------------------------------------------------------------
 
 st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
@@ -406,144 +570,6 @@ render_dataframe_download_button(
 )
 
 st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# CSV comparison
-# ---------------------------------------------------------------------------
-
-if compare_csvs:
-    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
-
-    render_mockup_panel_header(
-        title="CSV Jump Comparison",
-        subtitle="Compare volatility jump behavior between selected CSV files.",
-    )
-
-    with st.spinner("Comparing CSV jump profiles..."):
-        comparison_df = compare_jump_profiles(
-            csv_paths=[
-                csv_path,
-                compare_csv_path,
-            ],
-            labels=[
-                csv_path.stem,
-                compare_csv_path.stem,
-            ],
-            rolling_window=int(rolling_window),
-            threshold=float(jump_threshold),
-        )
-
-    friendly_comparison = format_jump_profile_comparison(comparison_df)
-
-    st.dataframe(
-        friendly_comparison,
-        use_container_width=True,
-    )
-
-    render_dataframe_download_button(
-        df=friendly_comparison,
-        filename=f"{analysis_name}_jump_comparison.csv",
-        label="Download jump comparison CSV",
-        key="download_jump_comparison",
-    )
-
-    comparison_metric = st.selectbox(
-        "Comparison chart metric",
-        [
-            "total_jumps",
-            "jump_rate_pct",
-            "largest_jump_score",
-            "avg_jump_score",
-        ],
-        format_func={
-            "total_jumps": "Total jumps",
-            "jump_rate_pct": "Jump rate %",
-            "largest_jump_score": "Largest jump score",
-            "avg_jump_score": "Average jump score",
-        }.get,
-    )
-
-    comparison_chart = go.Figure()
-
-    comparison_chart.add_trace(
-        go.Bar(
-            x=comparison_df["label"],
-            y=comparison_df[comparison_metric],
-            name=comparison_metric,
-        )
-    )
-
-    comparison_chart.update_layout(
-        template=plotly_template,
-        height=350,
-        margin=dict(l=20, r=20, t=40, b=20),
-        xaxis_title="CSV",
-        yaxis_title=comparison_metric,
-    )
-
-    st.plotly_chart(
-        comparison_chart,
-        use_container_width=True,
-    )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# ---------------------------------------------------------------------------
-# Related news/events
-# ---------------------------------------------------------------------------
-
-if show_related_news:
-    st.markdown('<div class="mockup-panel">', unsafe_allow_html=True)
-
-    render_mockup_panel_header(
-        title="Related News / Events",
-        subtitle=f"Nearby events within ±{int(news_window_minutes)} minutes of detected jumps.",
-    )
-
-    news_path = Path(news_path_input)
-
-    if not news_path.is_absolute():
-        news_path = PROJECT_ROOT / news_path
-
-    if not news_path.exists():
-        st.warning(
-            f"News/events CSV was not found: {news_path}. "
-            "Create this file later to match news to volatility jumps."
-        )
-
-    else:
-        news_matches = match_news_to_jumps_from_csv(
-            jump_df=top_jumps,
-            news_path=news_path,
-            window_minutes=int(news_window_minutes),
-        )
-
-        friendly_news_matches = format_news_matches_table(news_matches)
-
-        if friendly_news_matches.empty:
-            st.info(
-                "No related news/events were found near the selected volatility jumps."
-            )
-        else:
-            st.caption(
-                "These events happened near volatility jumps. This does not prove causation."
-            )
-
-            st.dataframe(
-                friendly_news_matches,
-                use_container_width=True,
-            )
-
-            render_dataframe_download_button(
-                df=friendly_news_matches,
-                filename=f"{analysis_name}_news_matches.csv",
-                label="Download news matches CSV",
-                key="download_news_matches",
-            )
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
