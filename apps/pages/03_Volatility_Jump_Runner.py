@@ -35,8 +35,11 @@ from src.dashboard_ui import (
     load_css,
     render_dataframe_download_button,
     render_footer_note,
+    render_mockup_export_hint,
     render_mockup_kpi_card,
     render_mockup_panel_header,
+    render_mockup_sidebar_section,
+    render_mockup_sidebar_summary,
 )
 
 from src.volatility_jump_exports import save_volatility_jump_result
@@ -69,7 +72,9 @@ load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
 # Sidebar controls
 # ---------------------------------------------------------------------------
 
-st.sidebar.title("Volatility Jump Settings")
+st.sidebar.title("Volatility Jump Runner")
+
+render_mockup_sidebar_section("Theme")
 
 theme = render_theme_selector()
 apply_streamlit_theme(theme)
@@ -95,10 +100,14 @@ DEFAULT_COMPARE_CSV_PATH = (
 DEFAULT_NEWS_PATH = PROJECT_ROOT / "data" / "news" / "market_news_events.csv"
 
 
+render_mockup_sidebar_section("Data")
+
 csv_path_input = st.sidebar.text_input(
     "CSV file path",
     value=str(DEFAULT_CSV_PATH),
 )
+
+render_mockup_sidebar_section("Comparison")
 
 compare_csvs = st.sidebar.checkbox(
     "Compare with another CSV",
@@ -110,6 +119,8 @@ compare_csv_path_input = st.sidebar.text_input(
     value=str(DEFAULT_COMPARE_CSV_PATH),
     disabled=not compare_csvs,
 )
+
+render_mockup_sidebar_section("News / Events")
 
 show_related_news = st.sidebar.checkbox(
     "Show related news/events",
@@ -130,6 +141,8 @@ news_window_minutes = st.sidebar.number_input(
     step=5,
     disabled=not show_related_news,
 )
+
+render_mockup_sidebar_section("Detection")
 
 rolling_window = st.sidebar.number_input(
     "Rolling window",
@@ -154,6 +167,8 @@ top_n = st.sidebar.number_input(
     value=10,
     step=1,
 )
+
+render_mockup_sidebar_section("Export")
 
 analysis_name = st.sidebar.text_input(
     "Analysis name",
@@ -195,6 +210,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+render_mockup_export_hint(
+    "CSV downloads are available after analysis runs."
+)
+
 st.divider()
 
 
@@ -203,6 +222,13 @@ st.divider()
 # ---------------------------------------------------------------------------
 
 if not run_analysis:
+    render_mockup_sidebar_summary(
+        total_rows="Pending",
+        date_range="Not loaded",
+        sessions="All Sessions",
+        timezone="Local CSV",
+    )
+
     st.info("Choose a CSV file and click **Run Analysis** to begin.")
     st.stop()
 
@@ -213,6 +239,13 @@ if not csv_path.is_absolute():
     csv_path = PROJECT_ROOT / csv_path
 
 if not csv_path.exists():
+    render_mockup_sidebar_summary(
+        total_rows="Missing",
+        date_range="Not loaded",
+        sessions="Unknown",
+        timezone="Local CSV",
+    )
+
     st.error(f"CSV file was not found: {csv_path}")
     st.stop()
 
@@ -223,6 +256,13 @@ if not compare_csv_path.is_absolute():
     compare_csv_path = PROJECT_ROOT / compare_csv_path
 
 if compare_csvs and not compare_csv_path.exists():
+    render_mockup_sidebar_summary(
+        total_rows="Missing",
+        date_range="Not loaded",
+        sessions="Unknown",
+        timezone="Local CSV",
+    )
+
     st.error(f"Comparison CSV file was not found: {compare_csv_path}")
     st.stop()
 
@@ -247,12 +287,27 @@ with st.spinner("Loading candles and detecting volatility jumps..."):
 total_rows = len(scored_df)
 total_jumps = int(scored_df["is_jump"].sum())
 
+if "datetime" in scored_df.columns and not scored_df.empty:
+    start_date = scored_df["datetime"].min()
+    end_date = scored_df["datetime"].max()
+    date_range_text = f"{start_date:%Y-%m-%d} → {end_date:%Y-%m-%d}"
+else:
+    date_range_text = "Unknown"
+
 if top_jumps.empty:
     largest_jump_score = 0.0
     average_jump_score = 0.0
 else:
     largest_jump_score = float(top_jumps["jump_score"].max())
     average_jump_score = float(top_jumps["jump_score"].mean())
+
+
+render_mockup_sidebar_summary(
+    total_rows=f"{total_rows:,}",
+    date_range=date_range_text,
+    sessions="All Sessions",
+    timezone="Local CSV",
+)
 
 
 # ---------------------------------------------------------------------------

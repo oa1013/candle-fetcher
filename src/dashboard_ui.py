@@ -205,3 +205,72 @@ def render_mockup_news_item(
         """,
         unsafe_allow_html=True,
     )
+
+def render_mockup_sidebar_section(title: str) -> None:
+    """
+    Render a small uppercase sidebar section label.
+    """
+
+    st.sidebar.markdown(
+        f"""
+        <div class="mockup-sidebar-section">
+            {title}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mockup_sidebar_summary(
+    total_rows: str,
+    date_range: str,
+    sessions: str,
+    timezone: str,
+) -> None:
+    """
+    Render a sidebar data summary card.
+    """
+
+    st.sidebar.markdown(
+        f"""
+        <div class="mockup-sidebar-summary">
+            <div class="mockup-sidebar-summary-title">Data Summary</div>
+
+            <div class="mockup-sidebar-summary-row">
+                <span>Total Rows</span>
+                <strong>{total_rows}</strong>
+            </div>
+
+            <div class="mockup-sidebar-summary-row">
+                <span>Date Range</span>
+                <strong>{date_range}</strong>
+            </div>
+
+            <div class="mockup-sidebar-summary-row">
+                <span>Sessions</span>
+                <strong>{sessions}</strong>
+            </div>
+
+            <div class="mockup-sidebar-summary-row">
+                <span>Timezone</span>
+                <strong>{timezone}</strong>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_mockup_export_hint(text: str) -> None:
+    """
+    Render a compact export/status hint in the main page.
+    """
+
+    st.markdown(
+        f"""
+        <div class="mockup-export-hint">
+            {text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

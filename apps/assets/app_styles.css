@@ -322,3 +322,67 @@ section[data-testid="stSidebar"] h3 {
     font-size: 0.82rem;
     margin-bottom: 0.5rem;
 }
+
+/* -------------------------------------------------------------------------
+   Mockup-style sidebar polish
+   ------------------------------------------------------------------------- */
+
+.mockup-sidebar-section {
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+}
+
+.mockup-sidebar-summary {
+    margin-top: 1rem;
+    padding: 0.9rem;
+    border-radius: 1rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.28));
+    background: var(--dashboard-panel, rgba(255, 255, 255, 0.75));
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.mockup-sidebar-summary-title {
+    font-size: 0.76rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dashboard-muted, #64748b);
+    margin-bottom: 0.65rem;
+}
+
+.mockup-sidebar-summary-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.7rem;
+    border-top: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.2));
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+}
+
+.mockup-sidebar-summary-row span {
+    color: var(--dashboard-muted, #64748b);
+}
+
+.mockup-sidebar-summary-row strong {
+    text-align: right;
+    font-weight: 850;
+}
+
+.mockup-export-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb;
+    font-size: 0.78rem;
+    font-weight: 850;
+}
