@@ -231,34 +231,29 @@ def render_mockup_sidebar_summary(
     Render a sidebar data summary card.
     """
 
-    st.sidebar.markdown(
-        f"""
-        <div class="mockup-sidebar-summary">
-            <div class="mockup-sidebar-summary-title">Data Summary</div>
-
-            <div class="mockup-sidebar-summary-row">
-                <span>Total Rows</span>
-                <strong>{total_rows}</strong>
-            </div>
-
-            <div class="mockup-sidebar-summary-row">
-                <span>Date Range</span>
-                <strong>{date_range}</strong>
-            </div>
-
-            <div class="mockup-sidebar-summary-row">
-                <span>Sessions</span>
-                <strong>{sessions}</strong>
-            </div>
-
-            <div class="mockup-sidebar-summary-row">
-                <span>Timezone</span>
-                <strong>{timezone}</strong>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    html = (
+        f'<div class="mockup-sidebar-summary">'
+        f'<div class="mockup-sidebar-summary-title">Data Summary</div>'
+        f'<div class="mockup-sidebar-summary-row">'
+        f'<span>Total Rows</span>'
+        f'<strong>{total_rows}</strong>'
+        f'</div>'
+        f'<div class="mockup-sidebar-summary-row">'
+        f'<span>Date Range</span>'
+        f'<strong>{date_range}</strong>'
+        f'</div>'
+        f'<div class="mockup-sidebar-summary-row">'
+        f'<span>Sessions</span>'
+        f'<strong>{sessions}</strong>'
+        f'</div>'
+        f'<div class="mockup-sidebar-summary-row">'
+        f'<span>Timezone</span>'
+        f'<strong>{timezone}</strong>'
+        f'</div>'
+        f'</div>'
     )
+
+    st.sidebar.markdown(html, unsafe_allow_html=True)
 
 
 def render_mockup_export_hint(text: str) -> None:
