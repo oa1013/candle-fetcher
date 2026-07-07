@@ -274,3 +274,85 @@ def render_mockup_export_hint(text: str) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+def render_mockup_topbar(
+    title: str,
+    subtitle: str,
+    status_text: str = "Last run: dashboard session",
+    action_text: str = "Export-ready",
+) -> None:
+    """
+    Render a mockup-style top bar with title, status, and action text.
+    """
+
+    html = (
+        f'<div class="mockup-topbar">'
+        f'<div>'
+        f'<div class="mockup-topbar-title">{title}</div>'
+        f'<div class="mockup-topbar-subtitle">{subtitle}</div>'
+        f'</div>'
+        f'<div class="mockup-topbar-actions">'
+        f'<span>{status_text}</span>'
+        f'<span class="mockup-refresh-pill">↻</span>'
+        f'<span class="mockup-export-pill">{action_text}</span>'
+        f'</div>'
+        f'</div>'
+    )
+
+    st.markdown(html, unsafe_allow_html=True)
+
+def apply_mockup_chart_layout(
+    fig,
+    height: int,
+    xaxis_title: str,
+    yaxis_title: str,
+) -> None:
+    """
+    Apply consistent chart styling for mockup-style dashboard charts.
+    """
+
+    fig.update_layout(
+        height=height,
+        margin=dict(l=18, r=18, t=28, b=18),
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+        ),
+    )
+
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=1,
+        zeroline=False,
+    )
+
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=1,
+        zeroline=False,
+    )
+
+def render_mockup_table_toolbar(
+    title: str,
+    detail: str,
+) -> None:
+    """
+    Render a compact toolbar above dashboard tables.
+    """
+
+    st.markdown(
+        f"""
+        <div class="mockup-table-toolbar">
+            <div>
+                <div class="mockup-table-toolbar-title">{title}</div>
+                <div class="mockup-table-toolbar-detail">{detail}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

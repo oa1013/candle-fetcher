@@ -386,3 +386,58 @@ section[data-testid="stSidebar"] h3 {
     font-size: 0.78rem;
     font-weight: 850;
 }
+
+/* -------------------------------------------------------------------------
+   Mockup-style top bar action pills
+   ------------------------------------------------------------------------- */
+
+.mockup-refresh-pill,
+.mockup-export-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2rem;
+    border-radius: 0.7rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.28));
+    background: var(--dashboard-panel, #ffffff);
+    color: #2563eb;
+    font-weight: 850;
+}
+
+.mockup-refresh-pill {
+    width: 2rem;
+    font-size: 1rem;
+}
+
+.mockup-export-pill {
+    padding: 0 0.85rem;
+    font-size: 0.78rem;
+}
+
+/* -------------------------------------------------------------------------
+   Mockup-style table toolbar
+   ------------------------------------------------------------------------- */
+
+.mockup-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0.6rem 0 0.7rem 0;
+    padding: 0.75rem 0.9rem;
+    border-radius: 0.9rem;
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.24));
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.mockup-table-toolbar-title {
+    font-size: 0.86rem;
+    font-weight: 900;
+}
+
+.mockup-table-toolbar-detail {
+    margin-top: 0.15rem;
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.78rem;
+    font-weight: 700;
+}

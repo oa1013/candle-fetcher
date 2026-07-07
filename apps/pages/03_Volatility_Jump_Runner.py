@@ -32,6 +32,7 @@ from src.volatility_jumps import (
 )
 
 from src.dashboard_ui import (
+    apply_mockup_chart_layout,
     load_css,
     render_dataframe_download_button,
     render_footer_note,
@@ -40,6 +41,8 @@ from src.dashboard_ui import (
     render_mockup_panel_header,
     render_mockup_sidebar_section,
     render_mockup_sidebar_summary,
+    render_mockup_table_toolbar,
+    render_mockup_topbar,
 )
 
 from src.volatility_jump_exports import save_volatility_jump_result
@@ -191,23 +194,11 @@ run_analysis = st.sidebar.button(
 # Header
 # ---------------------------------------------------------------------------
 
-st.markdown(
-    """
-    <div class="mockup-topbar">
-        <div>
-            <div class="mockup-topbar-title">Volatility Jump Runner</div>
-            <div class="mockup-topbar-subtitle">
-                Detect volatility spikes, compare CSVs, and review related news.
-            </div>
-        </div>
-        <div class="mockup-topbar-actions">
-            <span>Last run: dashboard session</span>
-            <span>↻</span>
-            <span>Export-ready</span>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+render_mockup_topbar(
+    title="Volatility Jump Runner",
+    subtitle="Detect volatility spikes, compare CSVs, and review related news.",
+    status_text="Last run: dashboard session",
+    action_text="Export Report",
 )
 
 render_mockup_export_hint(
@@ -378,33 +369,31 @@ with left_col:
             y=scored_df["close"],
             mode="lines",
             name="Close price",
+            line=dict(width=2),
         )
     )
 
     if not jump_points.empty:
-        price_fig.add_trace(
+           price_fig.add_trace(
             go.Scatter(
                 x=jump_points["datetime"],
                 y=jump_points["close"],
                 mode="markers",
                 name="Detected jumps",
-                marker=dict(size=7),
+                marker=dict(
+                    size=8,
+                    line=dict(width=1),
+                ),
             )
         )
 
-    price_fig.update_layout(
-        template=plotly_template,
+    price_fig.update_layout(template=plotly_template)
+
+    apply_mockup_chart_layout(
+        fig=price_fig,
         height=430,
-        margin=dict(l=20, r=20, t=25, b=20),
         xaxis_title="Datetime",
         yaxis_title="Close price",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-        ),
     )
 
     st.plotly_chart(price_fig, use_container_width=True)
@@ -427,6 +416,7 @@ with left_col:
             y=scored_df["jump_score"],
             mode="lines",
             name="Jump score",
+            line=dict(width=2),
         )
     )
 
@@ -436,19 +426,13 @@ with left_col:
         annotation_text=f"Threshold: {jump_threshold}",
     )
 
-    jump_score_fig.update_layout(
-        template=plotly_template,
+    jump_score_fig.update_layout(template=plotly_template)
+
+    apply_mockup_chart_layout(
+        fig=jump_score_fig,
         height=260,
-        margin=dict(l=20, r=20, t=25, b=20),
         xaxis_title="Datetime",
         yaxis_title="Jump score",
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-        ),
     )
 
     st.plotly_chart(jump_score_fig, use_container_width=True)
@@ -508,13 +492,15 @@ with right_col:
                 x=comparison_df["label"],
                 y=comparison_df[comparison_metric],
                 name=comparison_metric,
+                marker_line_width=1,
             )
         )
 
-        comparison_chart.update_layout(
-            template=plotly_template,
+        comparison_chart.update_layout(template=plotly_template)
+
+        apply_mockup_chart_layout(
+            fig=comparison_chart,
             height=300,
-            margin=dict(l=20, r=20, t=25, b=20),
             xaxis_title="CSV",
             yaxis_title=comparison_metric,
         )
@@ -522,6 +508,11 @@ with right_col:
         st.plotly_chart(
             comparison_chart,
             use_container_width=True,
+        )
+
+        render_mockup_table_toolbar(
+            title="Comparison Table",
+            detail="Jump profile metrics for each selected CSV.",
         )
 
         st.dataframe(
@@ -580,6 +571,11 @@ with right_col:
                     "These events happened near volatility jumps. This does not prove causation."
                 )
 
+                render_mockup_table_toolbar(
+                    title="Matched News Events",
+                    detail="Events found near the strongest volatility jumps.",
+                )
+
                 st.dataframe(
                     friendly_news_matches,
                     use_container_width=True,
@@ -612,9 +608,15 @@ render_mockup_panel_header(
 
 friendly_jumps = format_volatility_jump_table(top_jumps)
 
+render_mockup_table_toolbar(
+    title="Ranked Jump Results",
+    detail=f"Showing the top {int(top_n)} volatility jumps by jump score.",
+)
+
 st.dataframe(
     friendly_jumps,
     use_container_width=True,
+    height=360,
 )
 
 render_dataframe_download_button(
