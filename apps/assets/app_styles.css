@@ -502,3 +502,56 @@ section[data-testid="stSidebar"] h3 {
     margin-top: 0.35rem;
     margin-bottom: 0.25rem;
 }
+
+/* -------------------------------------------------------------------------
+   Sidebar logo / brand block
+   ------------------------------------------------------------------------- */
+
+.mockup-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0.65rem 0.95rem 0.65rem;
+    margin-bottom: 0.8rem;
+    border-bottom: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+}
+
+.mockup-sidebar-brand-logo {
+    width: 2.6rem;
+    height: 2.6rem;
+    flex: 0 0 2.6rem;
+    border-radius: 0.9rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(37, 99, 235, 0.12);
+    border: 1px solid var(--dashboard-border, rgba(148, 163, 184, 0.25));
+}
+
+.mockup-sidebar-brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 0.25rem;
+}
+
+.mockup-sidebar-brand-fallback {
+    font-weight: 950;
+    color: #2563eb;
+    font-size: 0.9rem;
+}
+
+.mockup-sidebar-brand-title {
+    font-size: 0.95rem;
+    font-weight: 950;
+    line-height: 1.1;
+}
+
+.mockup-sidebar-brand-subtitle {
+    margin-top: 0.18rem;
+    color: var(--dashboard-muted, #64748b);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.2;
+}

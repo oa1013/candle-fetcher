@@ -22,6 +22,7 @@ from src.theme_manager import (
 )
 
 from src.dashboard_ui import (
+    render_sidebar_brand,
     load_css,
     render_dataframe_download_button,
     render_footer_note,
@@ -45,6 +46,9 @@ st.set_page_config(
 )
 
 load_css(PROJECT_ROOT / "apps" / "assets" / "app_styles.css")
+render_sidebar_brand(
+    logo_path=PROJECT_ROOT / "apps" / "assets" / "candle_fetcher_logo.svg",
+)
 
 # ---------------------------------------------------------------------------
 # Sidebar controls

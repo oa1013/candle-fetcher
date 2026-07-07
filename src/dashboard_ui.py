@@ -4,6 +4,10 @@ from pathlib import Path
 
 import streamlit as st
 
+import base64
+
+from pathlib import Path
+
 
 def load_css(css_path: str | Path) -> None:
     """
@@ -351,3 +355,35 @@ def render_mockup_table_toolbar(
         """,
         unsafe_allow_html=True,
     )
+
+def render_sidebar_brand(
+    logo_path: Path,
+    title: str = "Candle Fetcher",
+    subtitle: str = "Session, volatility, and news dashboard",
+) -> None:
+    """
+    Render the dashboard logo and brand block in the sidebar.
+    """
+
+    logo_file = Path(logo_path)
+
+    if logo_file.exists():
+        encoded_logo = base64.b64encode(logo_file.read_bytes()).decode("utf-8")
+        logo_html = (
+            f'<img src="data:image/svg+xml;base64,{encoded_logo}" '
+            f'alt="{title}" />'
+        )
+    else:
+        logo_html = '<div class="mockup-sidebar-brand-fallback">CF</div>'
+
+    html = (
+        f'<div class="mockup-sidebar-brand">'
+        f'<div class="mockup-sidebar-brand-logo">{logo_html}</div>'
+        f'<div class="mockup-sidebar-brand-text">'
+        f'<div class="mockup-sidebar-brand-title">{title}</div>'
+        f'<div class="mockup-sidebar-brand-subtitle">{subtitle}</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+    st.sidebar.markdown(html, unsafe_allow_html=True)
