@@ -1,4 +1,4 @@
-
+from .session_filters import filter_by_session, get_session_config
 import pandas as pd
 
 
@@ -81,3 +81,44 @@ def calculate_daily_ranges(
     ).round(4)
 
     return daily
+
+def calculate_session_ranges(
+    df: pd.DataFrame,
+    session_name: str,
+) -> pd.DataFrame:
+    """
+    Calculate historical ranges for a configured trading session.
+
+    Uses Candle Fetcher's existing session definitions.
+    """
+
+    config = get_session_config(session_name)
+
+    if session_name.strip().lower() == "all_sessions":
+        return calculate_daily_ranges(
+            df,
+            timezone=config["timezone"],
+        )
+
+    filtered = filter_by_session(df, session_name)
+
+    if filtered.empty:
+        return pd.DataFrame(
+            columns=[
+                "trading_date", "session", "high", "low",
+                "candle_count", "range_points", "range_percent"
+            ]
+        )
+
+    results = calculate_daily_ranges(
+        filtered,
+        timezone=config["timezone"],
+    )
+
+    results.insert(
+        1,
+        "session",
+        session_name.strip().lower(),
+    )
+
+    return results
