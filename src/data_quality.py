@@ -180,3 +180,40 @@ def classify_candle_gaps(
     ] = "recurring_break_pattern"
 
     return result
+
+def classify_daily_coverage(
+    daily_ranges: pd.DataFrame,
+    reference_candles: int = 1365,
+) -> pd.DataFrame:
+    """
+    Classify daily candle coverage against a reference count.
+
+    A reduced count does not automatically mean missing
+    data. Holidays and shortened sessions may be legitimate.
+    """
+
+    if "candle_count" not in daily_ranges.columns:
+        raise ValueError("Missing required column: candle_count")
+
+    if reference_candles <= 0:
+        raise ValueError("reference_candles must be positive.")
+
+    result = daily_ranges.copy()
+
+    result["coverage_ratio"] = (
+        result["candle_count"] / reference_candles
+    ).round(4)
+
+    result["coverage_status"] = "reduced_coverage"
+
+    result.loc[
+        result["candle_count"] == reference_candles,
+        "coverage_status"
+    ] = "reference_coverage"
+
+    result.loc[
+        result["candle_count"] > reference_candles,
+        "coverage_status"
+    ] = "above_reference"
+
+    return result
