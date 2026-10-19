@@ -124,3 +124,59 @@ def detect_candle_gaps(
             "missing_intervals",
         ]
     ].reset_index(drop=True)
+
+def classify_candle_gaps(
+    gaps: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Classify detected candle gaps using observed patterns.
+
+    These are preliminary classifications, not confirmed
+    broker trading schedules.
+    """
+
+    required = {
+        "previous_candle",
+        "datetime",
+        "gap_minutes",
+    }
+
+    if not required.issubset(gaps.columns):
+        raise ValueError(
+            "Gap data is missing required columns."
+        )
+
+    result = gaps.copy()
+
+    if result.empty:
+        result["gap_classification"] = pd.Series(
+            dtype="string"
+        )
+        return result
+
+    previous = pd.to_datetime(
+        result["previous_candle"], utc=True
+    )
+    current = pd.to_datetime(
+        result["datetime"], utc=True
+    )
+
+    recurring_pattern = (
+        (result["gap_minutes"] == 76)
+        & (previous.dt.strftime("%H:%M") == "23:49")
+        & (current.dt.strftime("%H:%M") == "01:05")
+    )
+
+    result["gap_classification"] = "extended_gap_review"
+
+    result.loc[
+        result["gap_minutes"] < 76,
+        "gap_classification"
+    ] = "short_gap_review"
+
+    result.loc[
+        recurring_pattern,
+        "gap_classification"
+    ] = "recurring_break_pattern"
+
+    return result
