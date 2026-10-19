@@ -5,3 +5,5 @@ MetaTrader5
 tabulate
 streamlit
 plotly
+matplotlib
+
