@@ -1,0 +1,126 @@
+
+from __future__ import annotations
+
+import pandas as pd
+
+
+def validate_timestamps(
+    df: pd.DataFrame,
+    datetime_column: str = "datetime",
+) -> dict:
+    """
+    Validate candle timestamps for duplicates and ordering.
+
+    Returns a dictionary containing data-quality results.
+    Does not modify the original DataFrame.
+    """
+
+    if datetime_column not in df.columns:
+        raise ValueError(
+            f"Missing required datetime column: {datetime_column}"
+        )
+
+    if df.empty:
+        raise ValueError("Cannot validate an empty candle dataset.")
+
+    timestamps = pd.to_datetime(
+        df[datetime_column],
+        utc=True,
+        errors="raise",
+    )
+
+    if timestamps.isna().any():
+        raise ValueError("Dataset contains missing timestamps.")
+
+    duplicate_rows = int(
+        timestamps.duplicated(keep=False).sum()
+    )
+
+    backward_moves = int(
+        (timestamps.diff() < pd.Timedelta(0)).sum()
+    )
+
+    return {
+        "total_candles": len(df),
+        "unique_timestamps": int(timestamps.nunique()),
+        "duplicate_rows": duplicate_rows,
+        "is_chronologically_sorted": bool(
+            timestamps.is_monotonic_increasing
+        ),
+        "backward_movements": backward_moves,
+    }
+
+def detect_candle_gaps(
+    df: pd.DataFrame,
+    datetime_column: str = "datetime",
+    expected_frequency: str = "1min",
+) -> pd.DataFrame:
+    """
+    Identify gaps between consecutive candle timestamps.
+
+    Returns a DataFrame containing:
+    - previous_candle
+    - datetime
+    - gap_minutes
+    - missing_intervals
+
+    Does not modify the original dataset.
+    """
+
+    if datetime_column not in df.columns:
+        raise ValueError(
+            f"Missing required datetime column: {datetime_column}"
+        )
+
+    if df.empty:
+        raise ValueError("Cannot analyse gaps in an empty dataset.")
+
+    frequency = pd.Timedelta(expected_frequency)
+
+    if frequency <= pd.Timedelta(0):
+        raise ValueError("Expected frequency must be positive.")
+
+    timestamps = pd.to_datetime(
+        df[datetime_column],
+        utc=True,
+        errors="raise",
+    )
+
+    if timestamps.isna().any():
+        raise ValueError("Dataset contains missing timestamps.")
+
+    if timestamps.duplicated().any():
+        raise ValueError("Remove duplicate timestamps before gap analysis.")
+
+    if not timestamps.is_monotonic_increasing:
+        raise ValueError("Timestamps must be chronologically ordered.")
+
+    gaps = pd.DataFrame({
+        "datetime": timestamps,
+        "previous_candle": timestamps.shift(1),
+    })
+
+    gaps["time_difference"] = (
+        gaps["datetime"] - gaps["previous_candle"]
+    )
+
+    gaps = gaps[
+        gaps["time_difference"] > frequency
+    ].copy()
+
+    gaps["gap_minutes"] = (
+        gaps["time_difference"].dt.total_seconds() / 60
+    )
+
+    gaps["missing_intervals"] = (
+        gaps["time_difference"] / frequency - 1
+    ).astype(int)
+
+    return gaps[
+        [
+            "previous_candle",
+            "datetime",
+            "gap_minutes",
+            "missing_intervals",
+        ]
+    ].reset_index(drop=True)
