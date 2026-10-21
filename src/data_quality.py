@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .session_filters import get_session_config, filter_by_session
+
 
 def validate_timestamps(
     df: pd.DataFrame,
@@ -217,3 +219,102 @@ def classify_daily_coverage(
     ] = "above_reference"
 
     return result
+
+def validate_session_coverage(
+    df: pd.DataFrame,
+    session_name: str,
+    trading_date: str,
+    reference_start: str | None = None,
+) -> dict:
+    """
+    Validate one same-day trading session against its
+    configured local opening and closing times.
+
+    Designed for 1-minute candle data.
+    """
+
+    config = get_session_config(session_name)
+
+    if config["start"] is None or config["end"] is None:
+        raise ValueError("Choose a specific trading session.")
+
+    if df.empty:
+        raise ValueError("Cannot validate an empty dataset.")
+
+    data = df.copy()
+    data["datetime"] = pd.to_datetime(
+        data["datetime"], utc=True
+    )
+
+    filtered = filter_by_session(data, session_name)
+
+    timezone = config["timezone"]
+
+    local_times = filtered["datetime"].dt.tz_convert(timezone)
+
+    selected_date = pd.Timestamp(trading_date).date()
+
+    selected = filtered[
+        local_times.dt.date == selected_date
+    ].copy()
+
+    effective_start = (
+        reference_start
+        if reference_start is not None
+        else config["start"]
+    )
+
+    start_time = pd.Timestamp(
+        f"{trading_date} {effective_start}",
+        tz=timezone,
+    )
+
+    end_time = pd.Timestamp(
+        f"{trading_date} {config['end']}",
+        tz=timezone,
+    )
+
+    if start_time >= end_time:
+        raise ValueError(
+            "Reference start time must be earlier "
+            "than the session end time."
+        )
+
+    expected_index = pd.date_range(
+        start=start_time,
+        end=end_time,
+        freq="1min",
+        inclusive="left",
+    )
+
+    observed = pd.DatetimeIndex(
+        selected["datetime"].dt.tz_convert(timezone)
+    )
+
+    missing = expected_index.difference(observed)
+    
+    duplicate_candles = int(
+    observed.duplicated(keep=False).sum()
+)
+
+    return {
+        "session": session_name,
+        "trading_date": str(selected_date),
+        "expected_candles": len(expected_index),
+        "recorded_candles": len(observed),
+        "missing_candles": len(missing),
+        "duplicate_candles": duplicate_candles,
+        "first_candle_matches": (
+            len(observed) > 0
+            and observed.min() == expected_index[0]
+        ),
+        "last_candle_matches": (
+            len(observed) > 0
+            and observed.max() == expected_index[-1]
+        ),
+        "is_complete": (
+            len(missing) == 0
+            and len(observed) == len(expected_index)
+            and duplicate_candles == 0
+        ),
+    }
