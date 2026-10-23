@@ -1,5 +1,7 @@
-from .session_filters import filter_by_session, get_session_config
 import pandas as pd
+
+from .session_filters import filter_by_session, get_session_config
+from .data_quality import validate_session_coverage
 
 
 def calculate_range(df: pd.DataFrame) -> dict:
@@ -122,3 +124,101 @@ def calculate_session_ranges(
     )
 
     return results
+
+def calculate_session_ranges_with_quality(
+    df: pd.DataFrame,
+    session_name: str,
+    reference_start: str | None = None,
+) -> pd.DataFrame:
+    """
+    Calculate historical session ranges with candle
+    coverage and data-quality information.
+    """
+
+    range_data = df
+
+    if reference_start is not None:
+        config = get_session_config(session_name)
+
+        local_times = pd.to_datetime(
+            df["datetime"], utc=True
+        ).dt.tz_convert(config["timezone"])
+
+        reference_time = pd.Timestamp(
+            f"2000-01-01 {reference_start}"
+        ).time()
+
+        range_data = df.loc[
+            local_times.dt.time >= reference_time
+        ].copy()
+
+    ranges = calculate_session_ranges(
+        range_data,
+        session_name,
+    )
+
+    if ranges.empty:
+        return ranges.assign(
+            expected_candles=pd.Series(dtype="int64"),
+            missing_candles=pd.Series(dtype="int64"),
+            duplicate_candles=pd.Series(dtype="int64"),
+            first_candle_matches=pd.Series(dtype="bool"),
+            last_candle_matches=pd.Series(dtype="bool"),
+            is_complete=pd.Series(dtype="bool"),
+        )
+    
+    config = get_session_config(session_name)
+
+    quality_data = filter_by_session(
+        df, session_name
+    ).copy()
+
+    quality_data["quality_date"] = (
+        pd.to_datetime(
+            quality_data["datetime"], utc=True
+        )
+        .dt.tz_convert(config["timezone"])
+        .dt.date
+    )
+
+    quality_by_date = {
+        date: group.drop(columns="quality_date")
+        for date, group in quality_data.groupby("quality_date")
+    }
+
+    quality_reports = []
+
+    for trading_date in ranges["trading_date"]:
+        report = validate_session_coverage(
+            quality_by_date[
+                pd.Timestamp(trading_date).date()
+            ],
+            session_name=session_name,
+            trading_date=str(trading_date),
+            reference_start=reference_start,
+        )
+
+        quality_reports.append(report)
+
+    quality_df = pd.DataFrame(quality_reports)
+    
+    quality_df["trading_date"] = pd.to_datetime(
+        quality_df["trading_date"]
+    ).dt.date
+
+    return ranges.merge(
+        quality_df[
+            [
+                "trading_date",
+                "expected_candles",
+                "missing_candles",
+                "duplicate_candles",
+                "first_candle_matches",
+                "last_candle_matches",
+                "is_complete",
+            ]
+        ],
+        on="trading_date",
+        how="left",
+        validate="one_to_one",
+    )

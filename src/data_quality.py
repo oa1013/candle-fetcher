@@ -291,6 +291,11 @@ def validate_session_coverage(
         selected["datetime"].dt.tz_convert(timezone)
     )
 
+    observed = observed[
+        (observed >= start_time)
+        & (observed < end_time)
+    ]
+
     missing = expected_index.difference(observed)
     
     duplicate_candles = int(
