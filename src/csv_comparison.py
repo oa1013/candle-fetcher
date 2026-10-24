@@ -101,7 +101,9 @@ def calculate_aligned_return_similarity(
     )
 
     merged = pd.merge(a, b, on="datetime", how="inner")
-    merged = merged.dropna(subset=["close_return_a", "close_return_b"])
+    merged = merged.dropna(
+        subset=["close_return_a", "close_return_b"]
+    )
 
     overlap_rows = len(merged)
 
@@ -112,7 +114,9 @@ def calculate_aligned_return_similarity(
             "aligned_similarity_pct": None,
         }
 
-    correlation = merged["close_return_a"].corr(merged["close_return_b"])
+    correlation = merged["close_return_a"].corr(
+        merged["close_return_b"]
+    )
 
     if pd.isna(correlation):
         aligned_similarity = None
@@ -273,7 +277,16 @@ def compare_csv_files(
         labels = list(labels)
 
     if len(csv_paths) != len(labels):
-        raise ValueError("csv_paths and labels must have the same length.")
+        raise ValueError(
+            "csv_paths and labels must have the same length."
+        )
+
+    # Prevent duplicate labels from overwriting loaded datasets.
+    if len(labels) != len(set(labels)):
+        raise ValueError(
+            "Duplicate CSV labels detected. "
+            "Each dataset must have a unique label."
+        )
 
     metrics = []
     loaded_dataframes = {}

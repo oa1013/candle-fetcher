@@ -215,6 +215,16 @@ if missing_paths:
 labels = label_lines if label_lines else [path.stem for path in csv_paths]
 
 
+# Prevent duplicate CSV labels before running the comparison.
+if len(labels) != len(set(labels)):
+    st.error(
+        "Duplicate CSV labels detected. "
+        "Please give each dataset a unique label."
+    )
+    st.stop()
+
+
+
 with st.spinner("Comparing CSV files..."):
     result = compare_csv_files(
         csv_paths=csv_paths,
