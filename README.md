@@ -1,29 +1,30 @@
-﻿# Candle Fetcher
+﻿
+# Candle Fetcher
 
-A Python project for fetching MT5 / FTMO candle data, filtering it by trading session, comparing candle CSVs, finding calm or volatile market regimes, and detecting volatility jumps.
+A Python research project for fetching MT5 / FTMO candle data, filtering it by trading session, comparing candle CSVs, identifying calm or volatile market regimes, detecting volatility jumps, and analysing historical daily and session price ranges.
 
 The project supports:
 
-* MetaTrader 5 / FTMO candle fetching
-* New York session filtering
-* London session filtering
-* Asia session filtering
-* All sessions filtering
-* Custom date ranges
-* Year filters
-* Month filters
-* Week filters
-* Day filters
-* Custom raw CSV names
-* Custom processed CSV names
-* Flexible timeframe settings, with `1m` as the normal default
-* CSV comparison
-* Calm / normal / volatile / extreme CSV labels
-* Calmest or most volatile year, month, week, or day detection
-* Volatility jump detection
-* Volatility jump comparison between CSVs
-* Local news/event matching near volatility jumps
-* Interactive browser dashboard with light, dark, and auto theme modes
+- MetaTrader 5 / FTMO candle fetching
+- New York session filtering
+- London session filtering
+- Asia session filtering
+- All sessions filtering
+- Custom date ranges
+- Year, month, week, and day filters
+- Custom raw and processed CSV names
+- Flexible timeframe settings, with `1m` as the normal default
+- CSV comparison
+- Calm / normal / volatile / extreme CSV labels
+- Calmest or most volatile year, month, week, or day detection
+- Volatility jump detection
+- Volatility jump comparison between CSVs
+- Local news/event matching near volatility jumps
+- Interactive browser dashboard with light, dark, and auto theme modes
+- Daily and session high-to-low range analysis
+- Session completeness, missing candle, and duplicate timestamp checks
+- Quality-filtered range statistics, percentiles, and distribution charts
+- Automated regression tests with Python `unittest`
 
 ## Project Workflow
 
@@ -32,7 +33,7 @@ Each runner notebook can fetch candles directly from MetaTrader 5 and then proce
 The main workflow is:
 
 ```text
-MT5 / FTMO → data/raw/ → data/processed/ → comparison / regime analysis
+MT5 / FTMO → data/raw/ → data/processed/ → comparison / regime / range analysis
 ```
 
 Example:
@@ -112,7 +113,8 @@ candle-fetcher/
 │   ├── 04_all_sessions_runner.ipynb
 │   ├── 05_csv_comparison_runner.ipynb
 │   ├── 06_period_regime_finder.ipynb
-│   └── 07_volatility_jump_runner.ipynb
+│   ├── 07_volatility_jump_runner.ipynb
+│   └── 08_daily_session_range_analyzer.ipynb
 │
 ├── src/
 │   ├── __init__.py
@@ -134,9 +136,15 @@ candle-fetcher/
 │   ├── news_matcher.py
 │   ├── theme_manager.py
 │   ├── dashboard_ui.py
+│   ├── range_analysis.py
+│   ├── data_quality.py
 │   └── utils/
 │       ├── file_naming.py
 │       └── timeframes.py
+│
+├── tests/
+│   ├── test_range_analysis.py
+│   └── test_data_quality.py
 │
 ├── requirements.txt
 ├── .gitignore
@@ -167,10 +175,10 @@ Compares two or more processed CSV files.
 
 It can help identify whether selected CSV files look:
 
-* calm
-* normal
-* volatile
-* extreme
+- calm
+- normal
+- volatile
+- extreme
 
 It also creates similarity tables so different CSVs can be compared against each other.
 
@@ -180,18 +188,18 @@ Finds the calmest or most volatile year, month, week, or day from candle data.
 
 The notebook can either:
 
-* use an existing CSV file
-* fetch fresh candles from MetaTrader 5 / FTMO first
+- use an existing CSV file
+- fetch fresh candles from MetaTrader 5 / FTMO first
 
 You can control:
 
-* symbol
-* timeframe
-* date range
-* period type: year, month, week, or day
-* regime type: calm or volatile
-* number of results to show
-* custom output names
+- symbol
+- timeframe
+- date range
+- period type: year, month, week, or day
+- regime type: calm or volatile
+- number of results to show
+- custom output names
 
 ### `07_volatility_jump_runner.ipynb`
 
@@ -199,12 +207,22 @@ Detects the biggest volatility jumps inside a candle CSV.
 
 The notebook can show:
 
-* top volatility jumps
-* jump scores
-* price move percentages
-* jump regimes
-* user-friendly jump tables
-* saved jump reports
+- top volatility jumps
+- jump scores
+- price move percentages
+- jump regimes
+- user-friendly jump tables
+- saved jump reports
+
+### `08_daily_session_range_analyzer.ipynb`
+
+Analyses historical daily ranges and Asia, London, and New York trading-session ranges from processed candle CSV data.
+
+It presents session high/low and range in points and percentages, quality reports, incomplete-session lists, raw versus complete-session statistics, percentile tables, and range-distribution charts.
+
+It uses the functions in `src/range_analysis.py` and `src/data_quality.py`.
+
+The notebook analyses existing CSV data; it does not need an active MT5 connection just to read those files.
 
 ## Dashboard
 
@@ -222,26 +240,30 @@ streamlit run apps/candle_dashboard_app.py
 
 Dashboard pages:
 
-* **CSV Comparison**  
+- **CSV Comparison**
+
   Compare processed candle CSV files, review regime labels, similarity scores, pairwise differences, and download comparison tables.
 
-* **Period Regime Finder**  
+- **Period Regime Finder**
+
   Find the calmest or most volatile year, month, week, or day from candle data and download the ranked period table.
 
-* **Volatility Jump Runner**  
+- **Volatility Jump Runner**
+
   Detect volatility jumps, compare jump profiles, match nearby news or event data, and download jump tables.
 
-* **News / Events**  
+- **News / Events**
+
   View, upload, search, and download news/event CSV files used for volatility jump context.
 
 The dashboard supports:
 
-* light mode
-* dark mode
-* auto mode
-* consistent theme selection across every dashboard page
-* styled sidebar and dashboard cards
-* CSV download buttons for dashboard results
+- light mode
+- dark mode
+- auto mode
+- consistent theme selection across every dashboard page
+- styled sidebar and dashboard cards
+- CSV download buttons for dashboard results
 
 The notebooks are still kept as backup/testing runners, but the dashboard is now the main interface for regular analysis.
 
@@ -307,18 +329,18 @@ Connects the full session filtering workflow together.
 
 Calculates candle behavior metrics such as:
 
-* average range
-* median range
-* return volatility
-* tick volume
-* spread behavior
+- average range
+- median range
+- return volatility
+- tick volume
+- spread behavior
 
 It uses those metrics to classify CSV files as:
 
-* calm
-* normal
-* volatile
-* extreme
+- calm
+- normal
+- volatile
+- extreme
 
 ### `src/csv_comparison.py`
 
@@ -326,12 +348,12 @@ Compares two or more CSV files and calculates similarity percentages.
 
 It can compare:
 
-* New York vs London
-* London vs Asia
-* New York vs Asia
-* one year vs another year
-* one month vs another month
-* two files from the same session
+- New York vs London
+- London vs Asia
+- New York vs Asia
+- one year vs another year
+- one month vs another month
+- two files from the same session
 
 ### `src/comparison_exports.py`
 
@@ -349,14 +371,14 @@ Finds calm or volatile periods inside a candle CSV.
 
 It supports:
 
-* calmest year
-* calmest month
-* calmest week
-* calmest day
-* most volatile year
-* most volatile month
-* most volatile week
-* most volatile day
+- calmest year
+- calmest month
+- calmest week
+- calmest day
+- most volatile year
+- most volatile month
+- most volatile week
+- most volatile day
 
 ### `src/volatility_jumps.py`
 
@@ -364,14 +386,14 @@ Detects volatility jumps inside candle data.
 
 It calculates:
 
-* candle range
-* candle body
-* rolling range baseline
-* rolling ATR-style baseline
-* jump score
-* range-to-baseline ratio
-* price move percentage
-* jump regime
+- candle range
+- candle body
+- rolling range baseline
+- rolling ATR-style baseline
+- jump score
+- range-to-baseline ratio
+- price move percentage
+- jump regime
 
 ### `src/volatility_jump_exports.py`
 
@@ -384,8 +406,8 @@ data/jumps/reports/
 
 It can save:
 
-* top jump tables
-* markdown jump reports
+- top jump tables
+- markdown jump reports
 
 ### `src/volatility_jump_comparison.py`
 
@@ -393,14 +415,14 @@ Compares volatility jump behavior between multiple CSV files.
 
 It can compare:
 
-* total rows
-* total jumps
-* jump rate percentage
-* largest jump score
-* average jump score
-* median jump score
-* average price move percentage
-* largest price move percentage
+- total rows
+- total jumps
+- jump rate percentage
+- largest jump score
+- average jump score
+- median jump score
+- average price move percentage
+- largest price move percentage
 
 ### `src/news_matcher.py`
 
@@ -416,12 +438,30 @@ Controls light, dark, and auto theme options for the Streamlit dashboard.
 
 Provides reusable Streamlit dashboard UI helpers, including:
 
-* shared CSS loading
-* dashboard cards
-* status cards
-* page headers
-* footer notes
-* CSV download buttons
+- shared CSS loading
+- dashboard cards
+- status cards
+- page headers
+- footer notes
+- CSV download buttons
+
+### `src/range_analysis.py`
+
+Provides `calculate_range()`, `calculate_daily_ranges()`, `calculate_session_ranges()`, and `calculate_session_ranges_with_quality()`.
+
+These calculate high-to-low ranges in price points and percentages, grouped by day or by configured trading session.
+
+The quality-aware function attaches expected candle counts, missing candles, duplicate rows, boundary checks, and completeness flags.
+
+When a valid `reference_start` is provided, the price range and its quality check both use that reference window.
+
+### `src/data_quality.py`
+
+Contains utilities for timestamp ordering, duplicate detection, candle gaps, preliminary gap classification, daily coverage classification, and session completeness validation.
+
+`validate_session_coverage()` checks expected one-minute timestamps for a single same-day session.
+
+Coverage labels indicate whether the timestamps are present, not whether prices or broker schedules are independently verified.
 
 ### `src/utils/file_naming.py`
 
@@ -440,6 +480,84 @@ For example:
 ```
 
 This allows the notebooks to use simple timeframe inputs while still working correctly with MT5.
+
+## Daily & Session Range Analyzer
+
+The range analyzer works with processed candle CSVs containing `datetime`, `high`, and `low` columns, with one-minute data used for session completeness checks.
+
+Timestamps are interpreted as UTC and converted to each session's local timezone.
+
+Main notebook:
+
+`notebooks/08_daily_session_range_analyzer.ipynb`
+
+### Configured Session Windows
+
+| Session | Configured local window | Timezone | Expected 1-minute candles |
+|---|---|---|---:|
+| Asia | 09:00–12:00 | `Asia/Tokyo` | 180 |
+| London | 08:00–11:00 | `Europe/London` | 180 |
+| New York | 09:10–12:30 | `America/New_York` | 200 |
+
+For the historical FTMO US100.cash dataset investigated during development, the first Asia candle consistently appeared at **10:05 Tokyo time**.
+
+The notebook uses `reference_start="10:05"` when evaluating the **10:05–12:00 observed reference window** (115 expected one-minute candles).
+
+This is a dataset-based reference, **not a verified official FTMO trading schedule**. The configured 09:00–12:00 window is unchanged.
+
+### Example: Calculate Ranges and Quality
+
+From the repository root, with dependencies installed and a processed candle CSV available locally:
+
+```python
+import pandas as pd
+from src.range_analysis import calculate_session_ranges_with_quality
+
+df = pd.read_csv(
+    "data/processed/all_sessions/2025_full_year.csv",
+    parse_dates=["datetime"],
+)
+
+new_york = calculate_session_ranges_with_quality(
+    df,
+    session_name="new_york",
+)
+
+asia = calculate_session_ranges_with_quality(
+    df,
+    session_name="asia",
+    reference_start="10:05",
+)
+
+print(new_york[[
+    "trading_date",
+    "range_points",
+    "candle_count",
+    "missing_candles",
+    "duplicate_candles",
+    "is_complete",
+]].head())
+```
+
+The sample `2025_full_year.csv` is local research data and is not included in the Git repository.
+
+Use a CSV file you have fetched or prepared yourself.
+
+For whole-day ranges without a session quality check, use `calculate_daily_ranges(df)`.
+
+### Data Quality and Statistics
+
+The quality-aware output includes the session range, recorded and expected candle counts, missing and duplicated timestamps, first/last boundary checks, and an `is_complete` flag.
+
+A session with missing or duplicated candles is flagged incomplete, but remains in the raw results.
+
+The notebook separately compares raw statistics with statistics filtered to `is_complete == True`, computes complete-session percentiles (P10, P25, P50, P75, P90), and visualises range distributions.
+
+A complete flag checks **timestamp coverage in the chosen window**; it does not guarantee price accuracy, explain gaps, or prove the broker's official trading hours.
+
+Holiday and shortened-day patterns require separate investigation.
+
+Session coverage validation currently targets same-day, one-minute session windows.
 
 ## Data Folders
 
@@ -559,11 +677,11 @@ data/comparisons/reports/
 
 The comparison notebook can produce:
 
-* regime summary tables
-* pairwise similarity tables
-* volatility scores
-* calm / normal / volatile / extreme labels
-* markdown comparison reports
+- regime summary tables
+- pairwise similarity tables
+- volatility scores
+- calm / normal / volatile / extreme labels
+- markdown comparison reports
 
 ## Period Regime Finder
 
@@ -593,15 +711,15 @@ This finds the most volatile weeks.
 
 Supported periods:
 
-* year
-* month
-* week
-* day
+- year
+- month
+- week
+- day
 
 Supported regimes:
 
-* calm
-* volatile
+- calm
+- volatile
 
 ## Volatility Jump Runner
 
@@ -627,17 +745,17 @@ streamlit run apps/candle_dashboard_app.py
 
 The dashboard page can show:
 
-* total rows
-* detected jumps
-* largest jump score
-* average top jump score
-* price chart with jump markers
-* rolling jump score chart
-* top volatility jump table
-* CSV jump comparison table
-* CSV jump comparison chart
-* related news/events table
-* CSV download buttons for jump results, comparisons, and news matches
+- total rows
+- detected jumps
+- largest jump score
+- average top jump score
+- price chart with jump markers
+- rolling jump score chart
+- top volatility jump table
+- CSV jump comparison table
+- CSV jump comparison chart
+- related news/events table
+- CSV download buttons for jump results, comparisons, and news matches
 
 ## Volatility Jump Outputs
 
@@ -701,11 +819,11 @@ apps/pages/04_News_Events.py
 
 This page can:
 
-* load the local news/events CSV
-* fall back to the example news/events CSV if the local file is missing
-* upload a replacement news/events CSV
-* search event rows
-* download the filtered news/events table
+- load the local news/events CSV
+- fall back to the example news/events CSV if the local file is missing
+- upload a replacement news/events CSV
+- search event rows
+- download the filtered news/events table
 
 Run it through the main dashboard:
 
@@ -722,6 +840,30 @@ For CSV comparison, the tool decides which selected CSVs are calmer or more vola
 For the period regime finder, the tool decides which years, months, weeks, or days are calmer or more volatile compared with the other periods inside the selected candle data.
 
 For volatility jump detection, jump scores are calculated relative to the recent rolling volatility baseline.
+
+## Automated Tests
+
+The analyzer has a permanent `unittest` suite in:
+
+- `tests/test_range_analysis.py` — basic and daily ranges, plus Asia, London, and New York session filtering.
+- `tests/test_data_quality.py` — duplicate timestamps, missing candle gaps, complete and incomplete sessions, the observed Asia reference window, and invalid reference-time handling.
+
+Run the full test suite from the repository root:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+To run either test file separately:
+
+```powershell
+python -m unittest discover -s tests -p "test_range_analysis.py" -v
+python -m unittest discover -s tests -p "test_data_quality.py" -v
+```
+
+At the time of this update, **12 tests passed** in the development environment.
+
+Run them after changing the analyzer or session filters to check for regressions.
 
 ## Requirements
 
