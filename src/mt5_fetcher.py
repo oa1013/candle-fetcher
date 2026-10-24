@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import re
@@ -11,7 +12,6 @@ import MetaTrader5 as mt5
 import pandas as pd
 
 from .config import DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, RAW_DATA_DIR
-
 from .utils.timeframes import normalize_timeframe
 
 
@@ -229,10 +229,19 @@ def fetch_candles_by_range(
     Fetch candles from MT5 between explicit UTC datetimes.
     """
     if start_utc.tzinfo is None or end_utc_exclusive.tzinfo is None:
-        raise ValueError("start_utc and end_utc_exclusive must be timezone-aware.")
+        raise ValueError(
+            "start_utc and end_utc_exclusive must be timezone-aware."
+        )
 
     if end_utc_exclusive <= start_utc:
-        raise ValueError("end_utc_exclusive must be after start_utc.")
+        raise ValueError(
+            "end_utc_exclusive must be after start_utc."
+        )
+
+    if chunk_days <= 0:
+        raise ValueError(
+            "chunk_days must be greater than zero."
+        )
 
     chunks = []
     chunk_start = start_utc
@@ -245,7 +254,8 @@ def fetch_candles_by_range(
 
         print(
             f"Fetching chunk: "
-            f"{chunk_start:%Y-%m-%d %H:%M} -> {chunk_end:%Y-%m-%d %H:%M} UTC"
+            f"{chunk_start:%Y-%m-%d %H:%M} -> "
+            f"{chunk_end:%Y-%m-%d %H:%M} UTC"
         )
 
         rates = mt5.copy_rates_range(
@@ -256,12 +266,23 @@ def fetch_candles_by_range(
         )
 
         if rates is None:
-            print(f"WARNING: MT5 returned None. Error code: {mt5.last_error()}")
+            raise RuntimeError(
+                f"MT5 failed to fetch candles for chunk "
+                f"{chunk_start:%Y-%m-%d %H:%M} -> "
+                f"{chunk_end:%Y-%m-%d %H:%M} UTC. "
+                f"MT5 error: {mt5.last_error()}"
+            )
+
         elif len(rates) == 0:
-            print("WARNING: MT5 returned zero candles for this chunk.")
+            print(
+                "WARNING: MT5 returned zero candles for this chunk. "
+                "This may be due to market closure or missing historical data."
+            )
+
         else:
             chunks.append(rates_to_dataframe(rates))
 
+        # Always advance to the next chunk.
         chunk_start = chunk_end
 
     if not chunks:
@@ -310,11 +331,11 @@ def make_raw_output_filename(
         f"{range_part}_{start_day}_to_{end_day}.csv"
     )
 
+
 def make_custom_raw_output_filename(output_name: str) -> str:
     """
     Build a custom raw CSV filename from user input.
     """
-
     clean_name = str(output_name).strip()
 
     if clean_name.lower().endswith(".csv"):
@@ -393,7 +414,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
             range_name=config.range_name,
             start_day=start_day,
             end_day=end_day,
-    )
+        )
 
     output_path = save_raw_candles_to_csv(
         df=raw_df,
@@ -408,7 +429,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
         "first_datetime_utc": str(raw_df["datetime"].iloc[0]),
         "last_datetime_utc": str(raw_df["datetime"].iloc[-1]),
         "symbol": config.symbol,
-        "timeframe": timeframe_label,        
+        "timeframe": timeframe_label,
         "start_date": config.start_date,
         "end_date": config.end_date,
     }
