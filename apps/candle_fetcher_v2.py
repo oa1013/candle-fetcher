@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import streamlit as st
@@ -179,6 +178,33 @@ st.markdown(
         color: #FFFFFF;
     }
 
+
+    /* -----------------------------------------
+       Main Workspace Primary Buttons
+    ----------------------------------------- */
+
+    /* Electric-blue primary buttons */
+    [data-testid="stMainBlockContainer"]
+    .stButton button[data-testid="stBaseButton-primary"] {
+        background-color: #2563EB !important;
+        color: #FFFFFF !important;
+        border-color: #2563EB !important;
+    }
+
+    /* Darker blue when hovering */
+    [data-testid="stMainBlockContainer"]
+    .stButton button[data-testid="stBaseButton-primary"]:hover {
+        background-color: #1D4ED8 !important;
+        color: #FFFFFF !important;
+        border-color: #1D4ED8 !important;
+    }
+
+    /* Keep primary button text white */
+    [data-testid="stMainBlockContainer"]
+    .stButton button[data-testid="stBaseButton-primary"] p {
+        color: #FFFFFF !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -294,13 +320,142 @@ st.divider()
 
 if selected_page in RUNNERS:
 
-    st.subheader("Runner Workspace")
-
-    st.info(
-        f"{selected_page} selected. "
-        "Runner configuration and execution controls "
-        "will be added in the next development stages."
+    # Main workspace and right-side status panel
+    workspace_col, status_col = st.columns(
+        [3, 1],
+        gap="large",
     )
+
+    # ------------------------------------------
+    # Main runner configuration
+    # ------------------------------------------
+
+    with workspace_col:
+
+        with st.container(border=True):
+
+            st.subheader("Runner Configuration")
+
+            st.caption(
+                f"Configure and execute {selected_page}."
+            )
+
+            # ----------------------------------
+            # New York Runner controls
+            # ----------------------------------
+
+            if selected_page == "New York Runner":
+
+                symbol = st.text_input(
+                    "MT5 Instrument",
+                    value="US100.cash",
+                    key="ny_symbol",
+                )
+
+                start_col, end_col = st.columns(2)
+
+                with start_col:
+
+                    start_date = st.date_input(
+                        "Start Date",
+                        key="ny_start_date",
+                    )
+
+                with end_col:
+
+                    end_date = st.date_input(
+                        "End Date",
+                        key="ny_end_date",
+                    )
+
+                st.caption(
+                    "Timeframe: M1 (1-minute candles)"
+                )
+
+                # ----------------------------------
+                # Date validation
+                # ----------------------------------
+
+                if start_date > end_date:
+
+                    st.error(
+                        "Start Date must be on or before End Date."
+                    )
+
+                # ----------------------------------
+                # Instrument validation
+                # ----------------------------------
+
+                if not symbol.strip():
+
+                    st.error(
+                        "MT5 Instrument cannot be empty."
+                    )
+
+                # ----------------------------------
+                # Execution controls
+                # ----------------------------------
+
+                st.divider()
+
+                st.markdown("#### Execution")
+
+                configuration_valid = (
+                    bool(symbol.strip())
+                    and start_date <= end_date
+                )
+
+                if st.button(
+                    "Validate Configuration",
+                    key="ny_validate_configuration",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    st.success(
+                        "Configuration is valid. "
+                        "Ready for MT5 integration."
+                    )
+
+                st.caption(
+                    "Validation only. No candles are fetched yet."
+                )
+
+            # ----------------------------------
+            # Other runners (coming soon)
+            # ----------------------------------
+
+            else:
+
+                st.info(
+                    "Runner parameters and execution controls "
+                    "will be added in the next development stages."
+                )
+
+    # ------------------------------------------
+    # Right-side runner information
+    # ------------------------------------------
+
+    with status_col:
+
+        with st.container(border=True):
+
+            st.subheader("Runner Status")
+
+            st.write("**Not started**")
+
+            st.caption(
+                "No execution has started from this workspace."
+            )
+
+        with st.container(border=True):
+
+            st.subheader("Recent Runs")
+
+            st.caption(
+                "No runs recorded in Version 2.0 yet."
+            )
 
 
 # --------------------------------------------------
