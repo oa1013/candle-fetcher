@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Dict, Tuple
 from zoneinfo import ZoneInfo
 
-import MetaTrader5 as mt5
+from .mt5_compat import mt5
 import pandas as pd
 
 from .config import DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, RAW_DATA_DIR
