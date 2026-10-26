@@ -506,6 +506,31 @@ if selected_page in RUNNERS:
                         f"{session_rows:,} session candles exported."
                     )
 
+                    # ----------------------------------
+                    # Download exported New York CSV
+                    # ----------------------------------
+
+                    export_info = last_result["session"]["export"]
+
+                    try:
+                        with open(export_info["output_path"], "rb") as csv_file:
+                            csv_data = csv_file.read()
+
+                    except OSError as exc:
+                        st.error(
+                            f"Could not prepare the CSV download: {exc}"
+                        )
+
+                    else:
+                        st.download_button(
+                            label="Download New York CSV",
+                            data=csv_data,
+                            file_name=export_info["filename"],
+                            mime="text/csv",
+                            key="ny_download_csv",
+                            use_container_width=True,
+                        )
+
             # ----------------------------------
             # Other runners (coming soon)
             # ----------------------------------
