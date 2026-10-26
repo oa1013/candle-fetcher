@@ -1,6 +1,13 @@
+
 from __future__ import annotations
 
 import streamlit as st
+
+# --------------------------------------------------
+# Candle Fetcher 2.0 — Runner integrations
+# --------------------------------------------------
+
+from src.v2_runner_integration import run_new_york_v2
 
 
 # --------------------------------------------------
@@ -418,9 +425,86 @@ if selected_page in RUNNERS:
                         "Ready for MT5 integration."
                     )
 
-                st.caption(
-                    "Validation only. No candles are fetched yet."
+                # ----------------------------------
+                # Live New York Runner execution
+                # ----------------------------------
+
+                st.divider()
+
+                if st.button(
+                    "Run New York Runner",
+                    key="ny_run_live",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    # Clear the previous result before starting.
+                    st.session_state["ny_last_result"] = None
+
+                    try:
+
+                        with st.spinner(
+                            "Fetching MT5 candles and "
+                            "processing the New York session..."
+                        ):
+
+                            result = run_new_york_v2(
+                                symbol=symbol.strip(),
+                                start_date=start_date,
+                                end_date=end_date,
+                            )
+
+                        # Store results for the dashboard.
+                        st.session_state["ny_last_result"] = result
+
+                        # ----------------------------------
+                        # Recent successful runs
+                        # ----------------------------------
+
+                        recent_runs = st.session_state.setdefault(
+                            "ny_recent_runs", []
+                        )
+
+                        recent_runs.insert(
+                            0,
+                            {
+                                "run_id": result["run_id"],
+                                "symbol": result["symbol"],
+                                "start_date": result["start_date"],
+                                "end_date": result["end_date"],
+                                "candles": result["session"]["final_rows"],
+                                "export_path": result["session"]["export"]["output_path"],
+                            },
+                        )
+
+                        # Keep only the five latest successful runs.
+                        del recent_runs[5:]
+
+                    except Exception as exc:
+
+                        st.error(
+                            f"New York Runner failed: {exc}"
+                        )
+
+                # ----------------------------------
+                # Display successful execution
+                # ----------------------------------
+
+                last_result = st.session_state.get(
+                    "ny_last_result"
                 )
+
+                if last_result is not None:
+
+                    session_rows = last_result[
+                        "session"
+                    ]["final_rows"]
+
+                    st.success(
+                        "New York Runner completed successfully! "
+                        f"{session_rows:,} session candles exported."
+                    )
 
             # ----------------------------------
             # Other runners (coming soon)
@@ -443,19 +527,86 @@ if selected_page in RUNNERS:
 
             st.subheader("Runner Status")
 
-            st.write("**Not started**")
+            if selected_page == "New York Runner":
 
-            st.caption(
-                "No execution has started from this workspace."
-            )
+                status_result = st.session_state.get(
+                    "ny_last_result"
+                )
+
+                if status_result is not None:
+
+                    st.success("Completed")
+
+                    st.write(
+                        f"**{status_result['session']['final_rows']:,} "
+                        "session candles exported**"
+                    )
+
+                    st.caption(
+                        f"Instrument: {status_result['symbol']}"
+                    )
+
+                else:
+
+                    st.write("**Not started**")
+
+                    st.caption(
+                        "No successful execution recorded yet."
+                    )
+
+            else:
+
+                st.write("**Not started**")
+
+                st.caption(
+                    "No execution has started from this workspace."
+                )
+
+        # ------------------------------------------
+        # Recent Runs panel
+        # ------------------------------------------
 
         with st.container(border=True):
 
             st.subheader("Recent Runs")
 
-            st.caption(
-                "No runs recorded in Version 2.0 yet."
-            )
+            if selected_page == "New York Runner":
+
+                recent_runs = st.session_state.get(
+                    "ny_recent_runs", []
+                )
+
+                if recent_runs:
+
+                    for index, run in enumerate(recent_runs):
+
+                        st.write(
+                            f"**{run['symbol']}**"
+                        )
+
+                        st.caption(
+                            f"{run['start_date']} to "
+                            f"{run['end_date']}"
+                        )
+
+                        st.caption(
+                            f"{run['candles']:,} candles exported"
+                        )
+
+                        if index < len(recent_runs) - 1:
+                            st.divider()
+
+                else:
+
+                    st.caption(
+                        "No New York Runner executions recorded yet."
+                    )
+
+            else:
+
+                st.caption(
+                    "No runs recorded for this runner yet."
+                )
 
 
 # --------------------------------------------------
