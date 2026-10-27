@@ -15,6 +15,7 @@ from src.v2_runner_integration import (
 )
 
 from src.v2_csv_comparison_ui import render_csv_comparison_v2
+from src.v2_period_regime_ui import render_period_regime_v2
 
 # --------------------------------------------------
 # Page configuration
@@ -331,7 +332,10 @@ st.divider()
 # Runner workspace
 # --------------------------------------------------
 
-if selected_page == "CSV Comparison Runner":
+if selected_page == "Period Regime Finder":
+    render_period_regime_v2()
+
+elif selected_page == "CSV Comparison Runner":
     render_csv_comparison_v2()
 
 elif selected_page in RUNNERS:
