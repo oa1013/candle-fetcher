@@ -221,6 +221,19 @@ st.markdown(
         color: #FFFFFF !important;
     }
 
+
+    /* -----------------------------------------
+       Candle Fetcher V2 Number Input Fix
+    ----------------------------------------- */
+
+    /* Remove the unwanted horizontal borders
+       from Streamlit number-input wrappers. */
+
+    [data-testid="stNumberInput"] > div {
+        border-top: none !important;
+        border-bottom: none !important;
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
