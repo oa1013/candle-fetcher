@@ -224,7 +224,103 @@ It uses the functions in `src/range_analysis.py` and `src/data_quality.py`.
 
 The notebook analyses existing CSV data; it does not need an active MT5 connection just to read those files.
 
-## Dashboard
+## Candle Fetcher 2.0 ? Current Dashboard
+
+Candle Fetcher 2.0 is the current local Streamlit research interface.
+
+The main website file is:
+
+`apps/candle_fetcher_v2.py`
+
+### Start the Website
+
+Open a Windows PowerShell terminal in VS Code:
+
+```powershell
+cd C:\candle-fetcher
+python -m streamlit run .\apps\candle_fetcher_v2.py --server.port 8502
+```
+
+Then open:
+
+http://localhost:8502
+
+Press Ctrl+C in the terminal to stop Streamlit.
+
+### Eight Integrated Runners
+
+1. New York Runner
+2. London Runner
+3. Asia Runner
+4. All Sessions Runner
+5. CSV Comparison Runner
+6. Period Regime Finder
+7. Volatility Jump Runner
+8. Daily Session Range Analyzer
+
+The first four runners fetch and process MT5 / FTMO candles.
+
+The remaining four runners analyse processed historical CSV datasets.
+
+### Research Features
+
+- Historical candle collection and session filtering
+- CSV regime and similarity comparison
+- Calm and volatile period rankings
+- Volatility jump detection and daily frequency
+- Daily high-to-low range analysis
+- New York, London and Asia session-range comparisons
+- Session completeness and candle coverage
+- Interactive statistical graphs
+- Downloadable CSV tables and PNG charts
+
+### Timezones and Historical Data
+
+- MT5 / FTMO server: Europe/Athens
+- Historical CSV timestamps: UTC
+- New York session: America/New_York
+- London session: Europe/London
+- Asia session: Asia/Tokyo
+
+For the historical US100.cash dataset, the observed Asia
+reference window is 10:05?12:00 Tokyo time.
+
+This is a dataset-based reference and not a confirmed
+official broker trading schedule.
+
+Historical research CSV files are stored locally and
+are not distributed through the GitHub repository.
+
+MT5 must be available and logged in for live fetching.
+Historical CSV analysis does not require an active MT5 connection.
+
+### Current Scope
+
+Candle Fetcher 2.0 currently runs locally.
+
+It uses a dark navy Streamlit interface with blue accents.
+
+The News / Events page is excluded from the V2 sidebar.
+
+The original notebooks and older Streamlit dashboard remain
+available for research and compatibility.
+
+### Automated Verification
+
+Run the existing regression tests:
+
+```powershell
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+The existing test suite contains 12 tests.
+
+All eight V2 runner pages have also passed Streamlit
+AppTest navigation testing.
+
+---
+
+## Legacy Dashboard (Original Streamlit Interface)
 
 The project includes a Streamlit dashboard for running the main candle research tools from one interface:
 
