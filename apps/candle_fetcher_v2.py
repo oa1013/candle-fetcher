@@ -7,8 +7,10 @@ import streamlit as st
 # Candle Fetcher 2.0 — Runner integrations
 # --------------------------------------------------
 
-from src.v2_runner_integration import run_new_york_v2
-
+from src.v2_runner_integration import (
+    run_new_york_v2,
+    run_london_v2,
+)
 
 # --------------------------------------------------
 # Page configuration
@@ -532,6 +534,192 @@ if selected_page in RUNNERS:
                         )
 
             # ----------------------------------
+            # London Runner controls
+            # ----------------------------------
+
+            elif selected_page == "London Runner":
+
+                symbol = st.text_input(
+                    "MT5 Instrument",
+                    value="US100.cash",
+                    key="london_symbol",
+                )
+
+                start_col, end_col = st.columns(2)
+
+                with start_col:
+
+                    start_date = st.date_input(
+                        "Start Date",
+                        key="london_start_date",
+                    )
+
+                with end_col:
+
+                    end_date = st.date_input(
+                        "End Date",
+                        key="london_end_date",
+                    )
+
+                st.caption("Session: 08:00–11:00 (Europe/London)")
+
+                st.caption(
+                    "Timeframe: M1 (1-minute candles)"
+                )
+
+                # ----------------------------------
+                # Date validation
+                # ----------------------------------
+
+                if start_date > end_date:
+
+                    st.error(
+                        "Start Date must be on or before End Date."
+                    )
+
+                # ----------------------------------
+                # Instrument validation
+                # ----------------------------------
+
+                if not symbol.strip():
+
+                    st.error(
+                        "MT5 Instrument cannot be empty."
+                    )
+
+                # ----------------------------------
+                # Execution controls
+                # ----------------------------------
+
+                st.divider()
+
+                st.markdown("#### Execution")
+
+                configuration_valid = (
+                    bool(symbol.strip())
+                    and start_date <= end_date
+                )
+
+                if st.button(
+                    "Validate Configuration",
+                    key="london_validate_configuration",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    st.success(
+                        "Configuration is valid. "
+                        "Ready for MT5 integration."
+                    )
+
+                # ----------------------------------
+                # Live London Runner execution
+                # ----------------------------------
+
+                st.divider()
+
+                if st.button(
+                    "Run London Runner",
+                    key="london_run_live",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    # Clear the previous result before starting.
+                    st.session_state["london_last_result"] = None
+
+                    try:
+
+                        with st.spinner(
+                            "Fetching MT5 candles and "
+                            "processing the London session..."
+                        ):
+
+                            result = run_london_v2(
+                                symbol=symbol.strip(),
+                                start_date=start_date,
+                                end_date=end_date,
+                            )
+
+                        # Store results for the dashboard.
+                        st.session_state["london_last_result"] = result
+
+                        # ----------------------------------
+                        # Recent successful runs
+                        # ----------------------------------
+
+                        recent_runs = st.session_state.setdefault(
+                            "london_recent_runs", []
+                        )
+
+                        recent_runs.insert(
+                            0,
+                            {
+                                "run_id": result["run_id"],
+                                "symbol": result["symbol"],
+                                "start_date": result["start_date"],
+                                "end_date": result["end_date"],
+                                "candles": result["session"]["final_rows"],
+                                "export_path": result["session"]["export"]["output_path"],
+                            },
+                        )
+
+                        # Keep only the five latest successful runs.
+                        del recent_runs[5:]
+
+                    except Exception as exc:
+
+                        st.error(
+                            f"London Runner failed: {exc}"
+                        )
+
+                # ----------------------------------
+                # Display successful execution
+                # ----------------------------------
+
+                last_result = st.session_state.get(
+                    "london_last_result"
+                )
+
+                if last_result is not None:
+
+                    session_rows = last_result[
+                        "session"
+                    ]["final_rows"]
+
+                    st.success(
+                        "London Runner completed successfully! "
+                        f"{session_rows:,} session candles exported."
+                    )
+
+                    # ----------------------------------
+                    # Download exported London CSV
+                    # ----------------------------------
+
+                    export_info = last_result["session"]["export"]
+
+                    try:
+                        with open(export_info["output_path"], "rb") as csv_file:
+                            csv_data = csv_file.read()
+
+                    except OSError as exc:
+                        st.error(
+                            f"Could not prepare the CSV download: {exc}"
+                        )
+
+                    else:
+                        st.download_button(
+                            label="Download London CSV",
+                            data=csv_data,
+                            file_name=export_info["filename"],
+                            mime="text/csv",
+                            key="london_download_csv",
+                            use_container_width=True,
+                        )
+
+            # ----------------------------------
             # Other runners (coming soon)
             # ----------------------------------
 
@@ -556,6 +744,33 @@ if selected_page in RUNNERS:
 
                 status_result = st.session_state.get(
                     "ny_last_result"
+                )
+
+                if status_result is not None:
+
+                    st.success("Completed")
+
+                    st.write(
+                        f"**{status_result['session']['final_rows']:,} "
+                        "session candles exported**"
+                    )
+
+                    st.caption(
+                        f"Instrument: {status_result['symbol']}"
+                    )
+
+                else:
+
+                    st.write("**Not started**")
+
+                    st.caption(
+                        "No successful execution recorded yet."
+                    )
+
+            elif selected_page == "London Runner":
+
+                status_result = st.session_state.get(
+                    "london_last_result"
                 )
 
                 if status_result is not None:
@@ -625,6 +840,38 @@ if selected_page in RUNNERS:
 
                     st.caption(
                         "No New York Runner executions recorded yet."
+                    )
+
+            elif selected_page == "London Runner":
+
+                recent_runs = st.session_state.get(
+                    "london_recent_runs", []
+                )
+
+                if recent_runs:
+
+                    for index, run in enumerate(recent_runs):
+
+                        st.write(
+                            f"**{run['symbol']}**"
+                        )
+
+                        st.caption(
+                            f"{run['start_date']} to "
+                            f"{run['end_date']}"
+                        )
+
+                        st.caption(
+                            f"{run['candles']:,} candles exported"
+                        )
+
+                        if index < len(recent_runs) - 1:
+                            st.divider()
+
+                else:
+
+                    st.caption(
+                        "No London Runner executions recorded yet."
                     )
 
             else:
