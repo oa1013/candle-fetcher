@@ -14,6 +14,8 @@ from src.v2_runner_integration import (
     run_all_sessions_v2,
 )
 
+from src.v2_csv_comparison_ui import render_csv_comparison_v2
+
 # --------------------------------------------------
 # Page configuration
 # --------------------------------------------------
@@ -329,7 +331,10 @@ st.divider()
 # Runner workspace
 # --------------------------------------------------
 
-if selected_page in RUNNERS:
+if selected_page == "CSV Comparison Runner":
+    render_csv_comparison_v2()
+
+elif selected_page in RUNNERS:
 
     # Main workspace and right-side status panel
     workspace_col, status_col = st.columns(
