@@ -11,6 +11,7 @@ from src.v2_runner_integration import (
     run_new_york_v2,
     run_london_v2,
     run_asia_v2,
+    run_all_sessions_v2,
 )
 
 # --------------------------------------------------
@@ -907,6 +908,192 @@ if selected_page in RUNNERS:
                         )
 
             # ----------------------------------
+            # All Sessions Runner controls
+            # ----------------------------------
+
+            elif selected_page == "All Sessions Runner":
+
+                symbol = st.text_input(
+                    "MT5 Instrument",
+                    value="US100.cash",
+                    key="all_sessions_symbol",
+                )
+
+                start_col, end_col = st.columns(2)
+
+                with start_col:
+
+                    start_date = st.date_input(
+                        "Start Date",
+                        key="all_sessions_start_date",
+                    )
+
+                with end_col:
+
+                    end_date = st.date_input(
+                        "End Date",
+                        key="all_sessions_end_date",
+                    )
+
+                st.caption("Session: Full UTC calendar day (no session-time filter)")
+
+                st.caption(
+                    "Timeframe: M1 (1-minute candles)"
+                )
+
+                # ----------------------------------
+                # Date validation
+                # ----------------------------------
+
+                if start_date > end_date:
+
+                    st.error(
+                        "Start Date must be on or before End Date."
+                    )
+
+                # ----------------------------------
+                # Instrument validation
+                # ----------------------------------
+
+                if not symbol.strip():
+
+                    st.error(
+                        "MT5 Instrument cannot be empty."
+                    )
+
+                # ----------------------------------
+                # Execution controls
+                # ----------------------------------
+
+                st.divider()
+
+                st.markdown("#### Execution")
+
+                configuration_valid = (
+                    bool(symbol.strip())
+                    and start_date <= end_date
+                )
+
+                if st.button(
+                    "Validate Configuration",
+                    key="all_sessions_validate_configuration",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    st.success(
+                        "Configuration is valid. "
+                        "Ready for MT5 integration."
+                    )
+
+                # ----------------------------------
+                # Live All Sessions Runner execution
+                # ----------------------------------
+
+                st.divider()
+
+                if st.button(
+                    "Run All Sessions Runner",
+                    key="all_sessions_run_live",
+                    type="primary",
+                    use_container_width=True,
+                    disabled=not configuration_valid,
+                ):
+
+                    # Clear the previous result before starting.
+                    st.session_state["all_sessions_last_result"] = None
+
+                    try:
+
+                        with st.spinner(
+                            "Fetching MT5 candles and "
+                            "processing all available candles..."
+                        ):
+
+                            result = run_all_sessions_v2(
+                                symbol=symbol.strip(),
+                                start_date=start_date,
+                                end_date=end_date,
+                            )
+
+                        # Store results for the dashboard.
+                        st.session_state["all_sessions_last_result"] = result
+
+                        # ----------------------------------
+                        # Recent successful runs
+                        # ----------------------------------
+
+                        recent_runs = st.session_state.setdefault(
+                            "all_sessions_recent_runs", []
+                        )
+
+                        recent_runs.insert(
+                            0,
+                            {
+                                "run_id": result["run_id"],
+                                "symbol": result["symbol"],
+                                "start_date": result["start_date"],
+                                "end_date": result["end_date"],
+                                "candles": result["session"]["final_rows"],
+                                "export_path": result["session"]["export"]["output_path"],
+                            },
+                        )
+
+                        # Keep only the five latest successful runs.
+                        del recent_runs[5:]
+
+                    except Exception as exc:
+
+                        st.error(
+                            f"All Sessions Runner failed: {exc}"
+                        )
+
+                # ----------------------------------
+                # Display successful execution
+                # ----------------------------------
+
+                last_result = st.session_state.get(
+                    "all_sessions_last_result"
+                )
+
+                if last_result is not None:
+
+                    session_rows = last_result[
+                        "session"
+                    ]["final_rows"]
+
+                    st.success(
+                        "All Sessions Runner completed successfully! "
+                        f"{session_rows:,} candles exported."
+                    )
+
+                    # ----------------------------------
+                    # Download exported All Sessions CSV
+                    # ----------------------------------
+
+                    export_info = last_result["session"]["export"]
+
+                    try:
+                        with open(export_info["output_path"], "rb") as csv_file:
+                            csv_data = csv_file.read()
+
+                    except OSError as exc:
+                        st.error(
+                            f"Could not prepare the CSV download: {exc}"
+                        )
+
+                    else:
+                        st.download_button(
+                            label="Download All Sessions CSV",
+                            data=csv_data,
+                            file_name=export_info["filename"],
+                            mime="text/csv",
+                            key="all_sessions_download_csv",
+                            use_container_width=True,
+                        )
+
+            # ----------------------------------
             # Other runners (coming soon)
             # ----------------------------------
 
@@ -994,6 +1181,33 @@ if selected_page in RUNNERS:
                     st.write(
                         f"**{status_result['session']['final_rows']:,} "
                         "session candles exported**"
+                    )
+
+                    st.caption(
+                        f"Instrument: {status_result['symbol']}"
+                    )
+
+                else:
+
+                    st.write("**Not started**")
+
+                    st.caption(
+                        "No successful execution recorded yet."
+                    )
+
+            elif selected_page == "All Sessions Runner":
+
+                status_result = st.session_state.get(
+                    "all_sessions_last_result"
+                )
+
+                if status_result is not None:
+
+                    st.success("Completed")
+
+                    st.write(
+                        f"**{status_result['session']['final_rows']:,} "
+                        "candles exported**"
                     )
 
                     st.caption(
@@ -1118,6 +1332,38 @@ if selected_page in RUNNERS:
 
                     st.caption(
                         "No Asia Runner executions recorded yet."
+                    )
+
+            elif selected_page == "All Sessions Runner":
+
+                recent_runs = st.session_state.get(
+                    "all_sessions_recent_runs", []
+                )
+
+                if recent_runs:
+
+                    for index, run in enumerate(recent_runs):
+
+                        st.write(
+                            f"**{run['symbol']}**"
+                        )
+
+                        st.caption(
+                            f"{run['start_date']} to "
+                            f"{run['end_date']}"
+                        )
+
+                        st.caption(
+                            f"{run['candles']:,} candles exported"
+                        )
+
+                        if index < len(recent_runs) - 1:
+                            st.divider()
+
+                else:
+
+                    st.caption(
+                        "No All Sessions Runner executions recorded yet."
                     )
 
             else:
