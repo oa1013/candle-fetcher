@@ -17,6 +17,7 @@ from src.v2_runner_integration import (
 from src.v2_csv_comparison_ui import render_csv_comparison_v2
 from src.v2_period_regime_ui import render_period_regime_v2
 from src.v2_volatility_jump_ui import render_volatility_jump_v2
+from src.v2_daily_session_range_ui import render_daily_session_range_v2
 
 # --------------------------------------------------
 # Page configuration
@@ -341,6 +342,9 @@ elif selected_page == "CSV Comparison Runner":
 
 elif selected_page == "Volatility Jump Runner":
     render_volatility_jump_v2()
+
+elif selected_page == "Daily Session Range Analyzer":
+    render_daily_session_range_v2()
 
 elif selected_page in RUNNERS:
 
