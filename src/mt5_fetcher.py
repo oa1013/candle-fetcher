@@ -12,10 +12,12 @@ from .mt5_compat import mt5
 import pandas as pd
 
 from .config import DEFAULT_SYMBOL, DEFAULT_TIMEFRAME, RAW_DATA_DIR
+from .ftmo_time import ftmo_raw_seconds_to_utc, utc_to_ftmo_request_clock
 from .utils.timeframes import normalize_timeframe
 
 
 UTC_TZ = timezone.utc
+VERIFIED_FTMO_SERVER = "FTMO-Server3"
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +35,6 @@ TIMEFRAME_MAP = {
     "M12": mt5.TIMEFRAME_M12,
     "M15": mt5.TIMEFRAME_M15,
     "M20": mt5.TIMEFRAME_M20,
-    "M30": mt5.TIMEFRAME_M30,
     "H1": mt5.TIMEFRAME_H1,
     "H2": mt5.TIMEFRAME_H2,
     "H3": mt5.TIMEFRAME_H3,
@@ -73,6 +74,11 @@ class MT5FetchConfig:
 
     # Calendar dates are interpreted in this timezone before converting to UTC.
     date_timezone_name: str = "America/New_York"
+
+    # auto: enable Athens conversion only for verified FTMO-Server3.
+    # utc: preserve standard MetaTrader UTC behaviour.
+    # ftmo_athens: explicitly opt in to the observed FTMO clock format.
+    timestamp_mode: str = "auto"
 
 
 # ---------------------------------------------------------------------------
@@ -182,18 +188,23 @@ def empty_candle_dataframe() -> pd.DataFrame:
     )
 
 
-def rates_to_dataframe(rates) -> pd.DataFrame:
+def rates_to_dataframe(rates, *, ftmo_athens_clock: bool = False) -> pd.DataFrame:
     """Convert MT5 rates output into a clean OHLCV DataFrame."""
     df = pd.DataFrame(rates)
 
     if df.empty:
         return empty_candle_dataframe()
 
-    df["datetime"] = pd.to_datetime(
-        df["time"],
-        unit="s",
-        utc=True,
-    )
+    if ftmo_athens_clock:
+        # Broker server clock was encoded as Unix seconds. Convert to true UTC.
+        # Ambiguous/nonexistent Athens timestamps fail safely.
+        df["datetime"] = ftmo_raw_seconds_to_utc(df["time"])
+    else:
+        df["datetime"] = pd.to_datetime(
+            df["time"],
+            unit="s",
+            utc=True,
+        )
 
     df = df[
         [
@@ -224,6 +235,8 @@ def fetch_candles_by_range(
     start_utc: datetime,
     end_utc_exclusive: datetime,
     chunk_days: int = 31,
+    *,
+    ftmo_athens_clock: bool = False,
 ) -> pd.DataFrame:
     """
     Fetch candles from MT5 between explicit UTC datetimes.
@@ -258,11 +271,25 @@ def fetch_candles_by_range(
             f"{chunk_end:%Y-%m-%d %H:%M} UTC"
         )
 
+        # Keep internal boundaries in genuine UTC. Transform only at MT5 I/O.
+        if ftmo_athens_clock:
+            request_start = utc_to_ftmo_request_clock(chunk_start)
+            request_end = utc_to_ftmo_request_clock(chunk_end)
+        else:
+            request_start = chunk_start
+            request_end = chunk_end
+
+        if request_end <= request_start:
+            raise RuntimeError(
+                "FTMO server-clock request crosses a non-monotonic DST hour. "
+                "This interval cannot be requested safely by wall-clock alone."
+            )
+
         rates = mt5.copy_rates_range(
             symbol,
             timeframe_mt5,
-            chunk_start,
-            chunk_end,
+            request_start,
+            request_end,
         )
 
         if rates is None:
@@ -280,7 +307,9 @@ def fetch_candles_by_range(
             )
 
         else:
-            chunks.append(rates_to_dataframe(rates))
+            chunks.append(
+                rates_to_dataframe(rates, ftmo_athens_clock=ftmo_athens_clock)
+            )
 
         # Always advance to the next chunk.
         chunk_start = chunk_end
@@ -389,12 +418,46 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
     try:
         ensure_symbol_available(config.symbol)
 
+        # Restrict automatic FTMO clock treatment to the server we tested.
+        account = mt5.account_info()
+        if account is None:
+            raise RuntimeError("MT5 is connected but no logged-in account was found.")
+
+        server = str(getattr(account, "server", "")).strip()
+        mode = config.timestamp_mode.strip().lower()
+        if mode == "ftmo_athens":
+            use_ftmo_clock = True
+        elif mode == "utc":
+            use_ftmo_clock = False
+        elif mode == "auto":
+            if server == VERIFIED_FTMO_SERVER:
+                use_ftmo_clock = True
+            elif server.upper().startswith("FTMO"):
+                raise RuntimeError(
+                    f"FTMO server {server!r} has not been verified for Athens "
+                    "clock encoding. Set timestamp_mode explicitly only "
+                    "after testing that server."
+                )
+            else:
+                use_ftmo_clock = False
+        else:
+            raise ValueError(
+                "timestamp_mode must be 'auto', 'utc', or 'ftmo_athens'."
+            )
+
+        print(
+            f"MT5 timestamp mode: "
+            f"{'FTMO Athens clock' if use_ftmo_clock else 'UTC'} "
+            f"(server: {server})"
+        )
+
         raw_df = fetch_candles_by_range(
             symbol=config.symbol,
             timeframe_mt5=timeframe_mt5,
             start_utc=start_utc,
             end_utc_exclusive=end_utc_exclusive,
             chunk_days=config.chunk_days,
+            ftmo_athens_clock=use_ftmo_clock,
         )
 
     finally:
