@@ -1,4 +1,4 @@
-"""
+﻿"""
 Candle Fetcher — Multiple Directional Runs.
 
 Enumerates successive historical Method B movements.
@@ -35,6 +35,8 @@ RUN_COLUMNS = [
     "end_price",
     "movement_points",
     "close_progress_points",
+    "maximum_in_run_wick_excursion_points",
+    "maximum_in_run_wick_excursion_index",
     "maximum_wick_excursion_points",
     "maximum_wick_excursion_index",
     "duration_minutes",

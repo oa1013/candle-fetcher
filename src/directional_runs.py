@@ -1,4 +1,4 @@
-"""
+﻿"""
 Candle Fetcher — Directional Run Tracking.
 
 Method B: pullback-tolerant historical movement analysis.
@@ -55,10 +55,14 @@ def _track_candidate(
     """
     Follow one directional candidate through pullbacks.
 
-    The structural extreme is based on closing prices.
-    Intraminute wick excursions do not change its index.
+    Closing prices define the structural endpoint.
 
-    Wick excursions are retained as a separate metric.
+    Three complementary movement measurements are retained:
+    - Wick on the structural endpoint candle
+    - Largest wick within the directional run
+    - Largest wick through reversal confirmation
+
+    The starting reference candle's earlier wick is excluded.
     """
 
     segment_id = int(start["segment_id"])
@@ -71,8 +75,6 @@ def _track_candidate(
 
     bullish = direction == "bullish"
 
-    # The reference candle's close is our start price.
-    # Exclude its earlier high/low from forward movement.
     initial = data.iloc[
         start_index + 1:confirmation_index + 1
     ]
@@ -90,15 +92,31 @@ def _track_candidate(
         data.at[extreme_index, "close"]
     )
 
-    # Preserve the high/low of the structural endpoint
-    # candle for the legacy movement_points measurement.
     extreme_price = float(
         data.at[extreme_index, wick_column]
     )
 
-    # Separately measure the largest intraminute excursion.
     maximum_wick_price = float(
         data.at[wick_index, wick_column]
+    )
+
+    # The structural endpoint may precede start confirmation.
+    # Exclude any later wicks from the in-run measurement.
+    in_run_window = data.iloc[
+        start_index + 1:extreme_index + 1
+    ]
+
+    if bullish:
+        in_run_wick_index = int(
+            in_run_window["high"].idxmax()
+        )
+    else:
+        in_run_wick_index = int(
+            in_run_window["low"].idxmin()
+        )
+
+    in_run_wick_price = float(
+        data.at[in_run_wick_index, wick_column]
     )
 
     opposite_count = 0
@@ -122,6 +140,7 @@ def _track_candidate(
             data.at[index, wick_column]
         )
 
+        # Extended wick tracks the whole observation window.
         if bullish:
             if candle_wick > maximum_wick_price:
                 maximum_wick_price = candle_wick
@@ -131,6 +150,11 @@ def _track_candidate(
                 structural_close = close
                 extreme_index = index
                 extreme_price = candle_wick
+
+                # All wicks seen so far now fall within
+                # the newly extended structural run.
+                in_run_wick_price = maximum_wick_price
+                in_run_wick_index = wick_index
 
             opposite = close < previous_close
 
@@ -151,6 +175,9 @@ def _track_candidate(
                 structural_close = close
                 extreme_index = index
                 extreme_price = candle_wick
+
+                in_run_wick_price = maximum_wick_price
+                in_run_wick_index = wick_index
 
             opposite = close > previous_close
 
@@ -189,6 +216,10 @@ def _track_candidate(
         structural_close - start_price
     )
 
+    in_run_wick_points = abs(
+        in_run_wick_price - start_price
+    )
+
     maximum_wick_excursion_points = abs(
         maximum_wick_price - start_price
     )
@@ -211,6 +242,12 @@ def _track_candidate(
             extreme_price - start_price
         ),
         "close_progress_points": close_progress_points,
+        "maximum_in_run_wick_excursion_points": (
+            in_run_wick_points
+        ),
+        "maximum_in_run_wick_excursion_index": (
+            in_run_wick_index
+        ),
         "maximum_wick_excursion_points": (
             maximum_wick_excursion_points
         ),
