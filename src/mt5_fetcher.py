@@ -75,9 +75,9 @@ class MT5FetchConfig:
     # Calendar dates are interpreted in this timezone before converting to UTC.
     date_timezone_name: str = "America/New_York"
 
-    # auto: enable Athens conversion only for verified FTMO-Server3.
+    # auto: enable verified FTMO-Server3 clock conversion.
     # utc: preserve standard MetaTrader UTC behaviour.
-    # ftmo_athens: explicitly opt in to the observed FTMO clock format.
+    # ftmo_server: explicit FTMO clock mode; ftmo_athens: legacy alias.
     timestamp_mode: str = "auto"
 
 
@@ -425,7 +425,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
 
         server = str(getattr(account, "server", "")).strip()
         mode = config.timestamp_mode.strip().lower()
-        if mode == "ftmo_athens":
+        if mode in ("ftmo_server", "ftmo_athens"):
             use_ftmo_clock = True
         elif mode == "utc":
             use_ftmo_clock = False
@@ -434,7 +434,7 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
                 use_ftmo_clock = True
             elif server.upper().startswith("FTMO"):
                 raise RuntimeError(
-                    f"FTMO server {server!r} has not been verified for Athens "
+                    f"FTMO server {server!r} has not been verified for the observed FTMO "
                     "clock encoding. Set timestamp_mode explicitly only "
                     "after testing that server."
                 )
@@ -442,12 +442,12 @@ def fetch_raw_candles(config: MT5FetchConfig) -> Dict[str, object]:
                 use_ftmo_clock = False
         else:
             raise ValueError(
-                "timestamp_mode must be 'auto', 'utc', or 'ftmo_athens'."
+                "timestamp_mode must be 'auto', 'utc', 'ftmo_server', or 'ftmo_athens'."
             )
 
         print(
             f"MT5 timestamp mode: "
-            f"{'FTMO Athens clock' if use_ftmo_clock else 'UTC'} "
+            f"{'FTMO server clock (US DST)' if use_ftmo_clock else 'UTC'} "
             f"(server: {server})"
         )
 
