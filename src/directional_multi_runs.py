@@ -1,21 +1,24 @@
 """
 Candle Fetcher — Multiple Directional Runs.
 
-Experimental Method B historical run enumeration.
+Enumerates successive historical Method B movements.
 
-Uses confirmed directional starts and pullback-tolerant
-reversal detection. Keeps incomplete runs separate.
+Uses the shared single-run tracking implementation
+so both detectors apply identical structural rules.
 
-Descriptive analysis only; no forecasts or signals.
+Descriptive analysis only.
 """
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 
 from src.directional_continuation import calculate_wilder_atr
 from src.directional_starts import detect_directional_starts
+from src.directional_runs import (
+    _track_candidate,
+    _validate_reversal_settings,
+)
 
 
 RUN_COLUMNS = [
@@ -31,119 +34,14 @@ RUN_COLUMNS = [
     "end_time",
     "end_price",
     "movement_points",
+    "close_progress_points",
+    "maximum_wick_excursion_points",
+    "maximum_wick_excursion_index",
     "duration_minutes",
     "reversal_confirmation_index",
     "reversal_confirmation_time",
     "atr_at_start_confirmation",
 ]
-
-
-def _track_candidate(data, start, settings):
-    """Follow one candidate until a reversal or data boundary."""
-
-    segment_id = int(start["segment_id"])
-    start_index = int(start["start_index"])
-    confirmation_index = int(start["confirmation_index"])
-
-    direction = start["direction"]
-    start_price = float(start["start_price"])
-    starting_atr = float(start["atr_at_confirmation"])
-
-    # Our start price is the reference candle's close.
-    # Its high/low cannot count as subsequent movement.
-    initial = data.iloc[
-        start_index + 1:confirmation_index + 1
-    ]
-
-    if direction == "bullish":
-        extreme_index = int(initial["high"].idxmax())
-        extreme_price = float(data.at[extreme_index, "high"])
-    else:
-        extreme_index = int(initial["low"].idxmin())
-        extreme_price = float(data.at[extreme_index, "low"])
-
-    opposite_count = 0
-    reversal_index = None
-    status = "incomplete_end_of_data"
-
-    for index in range(confirmation_index + 1, len(data)):
-
-        if int(data.at[index, "segment_id"]) != segment_id:
-            status = "incomplete_gap"
-            break
-
-        high = float(data.at[index, "high"])
-        low = float(data.at[index, "low"])
-        close = float(data.at[index, "close"])
-        previous_close = float(data.at[index - 1, "close"])
-
-        if direction == "bullish":
-
-            if high > extreme_price:
-                extreme_price = high
-                extreme_index = index
-
-            opposite = close < previous_close
-            movement = extreme_price - start_price
-            retracement = extreme_price - close
-
-        else:
-
-            if low < extreme_price:
-                extreme_price = low
-                extreme_index = index
-
-            opposite = close > previous_close
-            movement = start_price - extreme_price
-            retracement = close - extreme_price
-
-        opposite_count = (
-            opposite_count + 1 if opposite else 0
-        )
-
-        threshold = max(
-            settings["reversal_atr_multiple"] * starting_atr,
-            settings["reversal_move_fraction"]
-            * max(movement, 0.0),
-        )
-
-        if (
-            opposite_count >= settings["min_opposite_closes"]
-            and retracement >= threshold
-        ):
-            reversal_index = index
-            status = "reversal_confirmed"
-            break
-
-    start_time = data.at[start_index, "datetime"]
-    end_time = data.at[extreme_index, "datetime"]
-
-    return {
-        "direction": direction,
-        "status": status,
-        "segment_id": segment_id,
-        "start_index": start_index,
-        "start_time": start_time,
-        "start_price": start_price,
-        "start_confirmation_index": confirmation_index,
-        "start_confirmation_time": data.at[
-            confirmation_index, "datetime"
-        ],
-        "end_index": extreme_index,
-        "end_time": end_time,
-        "end_price": extreme_price,
-        "movement_points": abs(extreme_price - start_price),
-        "duration_minutes": (
-            end_time - start_time
-        ).total_seconds() / 60,
-        "reversal_confirmation_index": reversal_index,
-        "reversal_confirmation_time": (
-            data.at[reversal_index, "datetime"]
-            if reversal_index is not None
-            else pd.NaT
-        ),
-        "atr_at_start_confirmation": starting_atr,
-    }
 
 
 def detect_directional_runs(
@@ -157,35 +55,20 @@ def detect_directional_runs(
     """
     Enumerate successive Method B runs.
 
-    A new candidate cannot start before the previous
-    run's price extreme. Opposite-direction candidates
-    may begin before the prior reversal is confirmed.
+    A new candidate cannot begin before the previous
+    structural endpoint.
 
-    Incomplete runs are retained with explicit statuses.
+    Opposite-direction candidates may be confirmed
+    before the preceding reversal is confirmed.
+
+    Incomplete runs retain explicit statuses.
     """
 
-    if (
-        isinstance(reversal_atr_multiple, bool)
-        or not isinstance(reversal_atr_multiple, (int, float))
-        or not np.isfinite(reversal_atr_multiple)
-        or reversal_atr_multiple <= 0
-    ):
-        raise ValueError("Invalid reversal ATR multiple.")
-
-    if (
-        isinstance(reversal_move_fraction, bool)
-        or not isinstance(reversal_move_fraction, (int, float))
-        or not np.isfinite(reversal_move_fraction)
-        or not 0 <= reversal_move_fraction <= 1
-    ):
-        raise ValueError("Invalid reversal movement fraction.")
-
-    if (
-        isinstance(min_opposite_closes, bool)
-        or not isinstance(min_opposite_closes, int)
-        or min_opposite_closes < 1
-    ):
-        raise ValueError("Invalid opposite-close requirement.")
+    _validate_reversal_settings(
+        reversal_atr_multiple,
+        reversal_move_fraction,
+        min_opposite_closes,
+    )
 
     starts = detect_directional_starts(
         candles,
@@ -228,11 +111,12 @@ def detect_directional_runs(
         if candidate_start < minimum_start_index:
             continue
 
-        # Do not restart the same direction using an
-        # old candidate from the previous run.
+        # Avoid restarting an existing directional run
+        # using a candidate confirmed before its reversal.
         if (
             candidate["direction"] == previous_direction
-            and candidate_confirmation <= previous_reversal_index
+            and candidate_confirmation
+            <= previous_reversal_index
         ):
             continue
 
@@ -246,8 +130,12 @@ def detect_directional_runs(
 
         if run["status"] == "reversal_confirmed":
 
-            minimum_start_index = int(run["end_index"])
+            minimum_start_index = int(
+                run["end_index"]
+            )
+
             previous_direction = run["direction"]
+
             previous_reversal_index = int(
                 run["reversal_confirmation_index"]
             )
@@ -261,4 +149,7 @@ def detect_directional_runs(
         else:
             break
 
-    return pd.DataFrame(runs, columns=RUN_COLUMNS)
+    return pd.DataFrame(
+        runs,
+        columns=RUN_COLUMNS,
+    )

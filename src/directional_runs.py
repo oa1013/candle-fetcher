@@ -1,12 +1,12 @@
 """
 Candle Fetcher — Directional Run Tracking.
 
-Initial Method B implementation.
+Method B: pullback-tolerant historical movement analysis.
 
-Tracks the first directional movement through small
-pullbacks until a meaningful reversal is confirmed.
+Closing prices define structural extremes and reversal
+retracements. Wick excursions are measured separately.
 
-Historical descriptive research only.
+No predictions, VWAP calculations, or trading signals.
 """
 
 from __future__ import annotations
@@ -18,16 +18,11 @@ from src.directional_continuation import calculate_wilder_atr
 from src.directional_starts import detect_directional_starts
 
 
-def track_first_directional_run(
-    candles: pd.DataFrame,
-    atr_period: int = 14,
-    min_atr_fraction: float = 0.5,
-    reversal_atr_multiple: float = 2.0,
-    reversal_move_fraction: float = 0.2,
-    min_opposite_closes: int = 2,
-) -> dict | None:
-    """Track the first confirmed directional start."""
-
+def _validate_reversal_settings(
+    reversal_atr_multiple,
+    reversal_move_fraction,
+    min_opposite_closes,
+):
     if (
         isinstance(reversal_atr_multiple, bool)
         or not isinstance(reversal_atr_multiple, (int, float))
@@ -51,46 +46,59 @@ def track_first_directional_run(
     ):
         raise ValueError("Invalid opposite-close requirement.")
 
-    starts = detect_directional_starts(
-        candles,
-        atr_period=atr_period,
-        min_atr_fraction=min_atr_fraction,
-    )
 
-    if starts.empty:
-        return None
+def _track_candidate(
+    data: pd.DataFrame,
+    start: pd.Series,
+    settings: dict,
+) -> dict:
+    """
+    Follow one directional candidate through pullbacks.
 
-    data = calculate_wilder_atr(
-        candles,
-        period=atr_period,
-    )
+    The structural extreme is based on closing prices.
+    Intraminute wick excursions do not change its index.
 
-    start = starts.iloc[0]
+    Wick excursions are retained as a separate metric.
+    """
 
+    segment_id = int(start["segment_id"])
     start_index = int(start["start_index"])
     confirmation_index = int(start["confirmation_index"])
-    segment_id = int(start["segment_id"])
+
     direction = start["direction"]
     start_price = float(start["start_price"])
     starting_atr = float(start["atr_at_confirmation"])
 
-    # Our start price is the reference candle's close.
-    # Its high/low cannot count as subsequent movement.
+    bullish = direction == "bullish"
+
+    # The reference candle's close is our start price.
+    # Exclude its earlier high/low from forward movement.
     initial = data.iloc[
         start_index + 1:confirmation_index + 1
     ]
 
-    extreme_column = (
-        "high" if direction == "bullish" else "low"
+    if bullish:
+        extreme_index = int(initial["close"].idxmax())
+        wick_index = int(initial["high"].idxmax())
+        wick_column = "high"
+    else:
+        extreme_index = int(initial["close"].idxmin())
+        wick_index = int(initial["low"].idxmin())
+        wick_column = "low"
+
+    structural_close = float(
+        data.at[extreme_index, "close"]
     )
 
-    if direction == "bullish":
-        extreme_index = int(initial["high"].idxmax())
-    else:
-        extreme_index = int(initial["low"].idxmin())
-
+    # Preserve the high/low of the structural endpoint
+    # candle for the legacy movement_points measurement.
     extreme_price = float(
-        data.at[extreme_index, extreme_column]
+        data.at[extreme_index, wick_column]
+    )
+
+    # Separately measure the largest intraminute excursion.
+    maximum_wick_price = float(
+        data.at[wick_index, wick_column]
     )
 
     opposite_count = 0
@@ -105,42 +113,69 @@ def track_first_directional_run(
             status = "incomplete_gap"
             break
 
-        high = float(data.at[index, "high"])
-        low = float(data.at[index, "low"])
         close = float(data.at[index, "close"])
         previous_close = float(
             data.at[index - 1, "close"]
         )
 
-        if direction == "bullish":
-            if high > extreme_price:
-                extreme_price = high
+        candle_wick = float(
+            data.at[index, wick_column]
+        )
+
+        if bullish:
+            if candle_wick > maximum_wick_price:
+                maximum_wick_price = candle_wick
+                wick_index = index
+
+            if close > structural_close:
+                structural_close = close
                 extreme_index = index
+                extreme_price = candle_wick
 
             opposite = close < previous_close
-            movement = extreme_price - start_price
-            retracement = extreme_price - close
+
+            close_progress = (
+                structural_close - start_price
+            )
+
+            retracement = (
+                structural_close - close
+            )
 
         else:
-            if low < extreme_price:
-                extreme_price = low
+            if candle_wick < maximum_wick_price:
+                maximum_wick_price = candle_wick
+                wick_index = index
+
+            if close < structural_close:
+                structural_close = close
                 extreme_index = index
+                extreme_price = candle_wick
 
             opposite = close > previous_close
-            movement = start_price - extreme_price
-            retracement = close - extreme_price
+
+            close_progress = (
+                start_price - structural_close
+            )
+
+            retracement = (
+                close - structural_close
+            )
 
         opposite_count = (
             opposite_count + 1 if opposite else 0
         )
 
         threshold = max(
-            reversal_atr_multiple * starting_atr,
-            reversal_move_fraction * max(movement, 0.0),
+            settings["reversal_atr_multiple"]
+            * starting_atr,
+            settings["reversal_move_fraction"]
+            * max(close_progress, 0.0),
         )
 
         if (
-            opposite_count >= min_opposite_closes
+            opposite_count
+            >= settings["min_opposite_closes"]
             and retracement >= threshold
         ):
             reversal_index = index
@@ -149,6 +184,14 @@ def track_first_directional_run(
 
     start_time = data.at[start_index, "datetime"]
     end_time = data.at[extreme_index, "datetime"]
+
+    close_progress_points = abs(
+        structural_close - start_price
+    )
+
+    maximum_wick_excursion_points = abs(
+        maximum_wick_price - start_price
+    )
 
     return {
         "direction": direction,
@@ -167,6 +210,11 @@ def track_first_directional_run(
         "movement_points": abs(
             extreme_price - start_price
         ),
+        "close_progress_points": close_progress_points,
+        "maximum_wick_excursion_points": (
+            maximum_wick_excursion_points
+        ),
+        "maximum_wick_excursion_index": wick_index,
         "duration_minutes": (
             end_time - start_time
         ).total_seconds() / 60,
@@ -178,3 +226,46 @@ def track_first_directional_run(
         ),
         "atr_at_start_confirmation": starting_atr,
     }
+
+
+def track_first_directional_run(
+    candles: pd.DataFrame,
+    atr_period: int = 14,
+    min_atr_fraction: float = 0.5,
+    reversal_atr_multiple: float = 2.0,
+    reversal_move_fraction: float = 0.2,
+    min_opposite_closes: int = 2,
+) -> dict | None:
+    """Track the first confirmed directional start."""
+
+    _validate_reversal_settings(
+        reversal_atr_multiple,
+        reversal_move_fraction,
+        min_opposite_closes,
+    )
+
+    starts = detect_directional_starts(
+        candles,
+        atr_period=atr_period,
+        min_atr_fraction=min_atr_fraction,
+    )
+
+    if starts.empty:
+        return None
+
+    data = calculate_wilder_atr(
+        candles,
+        period=atr_period,
+    )
+
+    settings = {
+        "reversal_atr_multiple": reversal_atr_multiple,
+        "reversal_move_fraction": reversal_move_fraction,
+        "min_opposite_closes": min_opposite_closes,
+    }
+
+    return _track_candidate(
+        data,
+        starts.iloc[0],
+        settings,
+    )
