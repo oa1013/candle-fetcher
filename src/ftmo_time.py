@@ -1,57 +1,97 @@
 ﻿"""
-FTMO-specific MT5 server-clock timestamp conversions.
+FTMO-Server3 server-clock timestamp conversions.
 
-FTMO-Server3 was observed returning Athens wall-clock values
-encoded as Unix timestamps.
+Observed FTMO-Server3 timestamps encode broker wall-clock
+values as Unix timestamps.
 
-These helpers are deliberately isolated so they are not
-automatically applied to other MT5 brokers.
+For the verified 2024 historical data, the broker clock
+follows US daylight-saving transitions:
+
+    FTMO wall time = New York wall time + 7 hours
+
+Therefore:
+    Winter: FTMO = UTC+2
+    Summer: FTMO = UTC+3
+
+This logic is specific to the verified FTMO server
+convention, not a universal MetaTrader5 convention.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pandas as pd
 
 
-FTMO_TIMEZONE = ZoneInfo("Europe/Athens")
 UTC = timezone.utc
+FTMO_REFERENCE_TIMEZONE = ZoneInfo("America/New_York")
+FTMO_NEW_YORK_OFFSET = timedelta(hours=7)
 
 
 def utc_to_ftmo_request_clock(value: datetime) -> datetime:
     """
-    Convert a real timezone-aware instant into the
-    UTC-labelled Athens clock expected by the observed
-    FTMO-Server3 MT5 request interface.
+    Convert a genuine timezone-aware instant into
+    the UTC-labelled FTMO broker wall-clock value.
+
+    The broker clock is seven wall-clock hours ahead
+    of America/New_York for the verified convention.
     """
     if value.tzinfo is None or value.utcoffset() is None:
-        raise ValueError("Input datetime must be timezone-aware.")
+        raise ValueError(
+            "Input datetime must be timezone-aware."
+        )
 
-    athens_time = value.astimezone(FTMO_TIMEZONE)
+    new_york_local = value.astimezone(
+        FTMO_REFERENCE_TIMEZONE
+    )
 
-    return athens_time.replace(tzinfo=UTC)
+    new_york_wall = new_york_local.replace(
+        tzinfo=None
+    )
+
+    ftmo_wall = (
+        new_york_wall + FTMO_NEW_YORK_OFFSET
+    )
+
+    return ftmo_wall.replace(tzinfo=UTC)
 
 
-def ftmo_raw_seconds_to_utc(seconds: pd.Series) -> pd.Series:
+def ftmo_raw_seconds_to_utc(
+    seconds: pd.Series,
+) -> pd.Series:
     """
-    Convert raw FTMO server-clock Unix values into
-    genuine timezone-aware UTC timestamps.
+    Decode FTMO broker-clock Unix labels into genuine
+    timezone-aware UTC timestamps.
 
-    Raise an error for ambiguous or nonexistent Athens
-    local times rather than silently corrupting data.
+    First reconstruct the New York wall clock by
+    subtracting seven hours, then localize it using
+    America/New_York daylight-saving rules.
+
+    Ambiguous and nonexistent wall-clock times raise
+    errors rather than being silently interpreted.
     """
-    server_clock = pd.to_datetime(
+    server_labels = pd.to_datetime(
         seconds,
         unit="s",
         utc=True,
         errors="raise",
     )
 
+    server_wall = server_labels.dt.tz_localize(
+        None
+    )
+
+    new_york_wall = (
+        server_wall
+        - pd.Timedelta(
+            FTMO_NEW_YORK_OFFSET
+        )
+    )
+
     return (
-        server_clock
-        .dt.tz_localize(None)
+        new_york_wall
         .dt.tz_localize(
-            "Europe/Athens",
+            "America/New_York",
             ambiguous="raise",
             nonexistent="raise",
         )

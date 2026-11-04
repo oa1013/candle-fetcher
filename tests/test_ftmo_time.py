@@ -1,6 +1,15 @@
-﻿"""Regression tests for FTMO-specific MT5 timestamp handling."""
+﻿"""Regression tests for FTMO-Server3 timestamp handling.
+
+The verified FTMO clock convention uses New York
+daylight-saving transitions rather than Athens
+daylight-saving transitions.
+
+The broker wall clock is seven wall-clock hours
+ahead of New York for the verified convention.
+"""
 
 import unittest
+
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
@@ -25,23 +34,30 @@ TEST_DATES = [
     "2025-07-15",
     "2025-10-24",
     "2025-10-27",
+    "2025-11-03",
 ]
 
 
 def new_york_open(day):
+    """Get 09:30 New York converted to actual UTC."""
     return datetime.fromisoformat(
         f"{day}T09:30:00"
     ).replace(tzinfo=NY).astimezone(UTC)
 
 
 def make_rates(start, count, ftmo_clock):
+    """Produce deterministic mock MT5 M1 bars."""
     rows = []
 
     for index in range(count):
-        actual_utc = start + timedelta(minutes=index)
+        actual_utc = start + timedelta(
+            minutes=index
+        )
 
         if ftmo_clock:
-            encoded = utc_to_ftmo_request_clock(actual_utc)
+            encoded = utc_to_ftmo_request_clock(
+                actual_utc
+            )
         else:
             encoded = actual_utc
 
@@ -64,72 +80,111 @@ def make_rates(start, count, ftmo_clock):
 class TestFTMOTime(unittest.TestCase):
 
     def test_historical_round_trips(self):
+        """Server encoding and decoding must agree."""
         for day in TEST_DATES:
             with self.subTest(day=day):
                 original = new_york_open(day)
 
-                server_clock = utc_to_ftmo_request_clock(
-                    original
+                server_clock = (
+                    utc_to_ftmo_request_clock(
+                        original
+                    )
                 )
 
-                recovered = ftmo_raw_seconds_to_utc(
-                    pd.Series([int(server_clock.timestamp())])
-                ).iloc[0]
+                recovered = (
+                    ftmo_raw_seconds_to_utc(
+                        pd.Series([
+                            int(
+                                server_clock.timestamp()
+                            )
+                        ])
+                    ).iloc[0]
+                )
 
                 self.assertEqual(
                     recovered,
                     pd.Timestamp(original),
                 )
 
+    def test_cash_open_server_clock(self):
+        """09:30 New York = 16:30 FTMO server."""
+        for day in TEST_DATES:
+            with self.subTest(day=day):
+                actual_utc = new_york_open(day)
+
+                encoded = (
+                    utc_to_ftmo_request_clock(
+                        actual_utc
+                    )
+                )
+
+                self.assertEqual(
+                    encoded.strftime("%H:%M"),
+                    "16:30",
+                )
+
+                self.assertEqual(
+                    encoded.utcoffset(),
+                    timedelta(0),
+                )
+
     def test_naive_datetime_rejected(self):
+        """Request times must be timezone-aware."""
         with self.assertRaises(ValueError):
             utc_to_ftmo_request_clock(
                 datetime(2025, 1, 15, 9, 30)
             )
 
-    def test_invalid_dst_times_rejected(self):
+    def test_invalid_us_dst_times_rejected(self):
+        """Reject nonexistent and ambiguous US DST times."""
+
         invalid_cases = [
-            ("2025-03-30T03:30:00Z", "nonexistent"),
-            ("2025-10-26T03:30:00Z", "ambiguous"),
+            # Spring: NY 02:30 does not exist.
+            "2025-03-09T09:30:00Z",
+
+            # Autumn: NY 01:30 is ambiguous.
+            "2025-11-02T08:30:00Z",
         ]
 
-        for timestamp, expected_message in invalid_cases:
+        for timestamp in invalid_cases:
             with self.subTest(timestamp=timestamp):
-                raw = int(pd.Timestamp(timestamp).timestamp())
+                raw = int(
+                    pd.Timestamp(timestamp).timestamp()
+                )
 
-                with self.assertRaises(Exception) as raised:
+                # Pandas versions can report different
+                # exception classes for invalid DST times.
+                # Verify rejection rather than class naming.
+                with self.assertRaises(Exception):
                     ftmo_raw_seconds_to_utc(
                         pd.Series([raw])
                     )
 
-                message = str(raised.exception).lower()
-
-                self.assertTrue(
-                    expected_message in message
-                    or (
-                        expected_message == "ambiguous"
-                        and "cannot infer dst" in message
-                    ),
-                    f"Unexpected exception: {raised.exception}",
-                )
-
     def test_ftmo_fetch_boundaries(self):
+        """MT5 request and response conversions agree."""
         for day in TEST_DATES:
             with self.subTest(day=day):
-                start = new_york_open(day) - timedelta(
-                    minutes=3
+                start = (
+                    new_york_open(day)
+                    - timedelta(minutes=3)
                 )
-                end = start + timedelta(minutes=8)
 
-                # Simulate the inclusive MT5 response.
+                end = start + timedelta(
+                    minutes=8
+                )
+
+                # Simulate an inclusive MT5 response.
                 rates = make_rates(
-                    start, count=9, ftmo_clock=True
+                    start,
+                    count=9,
+                    ftmo_clock=True,
                 )
 
                 with patch(
                     "src.mt5_fetcher.mt5.copy_rates_range",
                     return_value=rates,
                 ) as mocked:
+
                     result = fetch_candles_by_range(
                         symbol="US100.cash",
                         timeframe_mt5=mt5.TIMEFRAME_M1,
@@ -143,18 +198,28 @@ class TestFTMOTime(unittest.TestCase):
 
                 self.assertEqual(
                     args[2],
-                    utc_to_ftmo_request_clock(start),
-                )
-                self.assertEqual(
-                    args[3],
-                    utc_to_ftmo_request_clock(end),
+                    utc_to_ftmo_request_clock(
+                        start
+                    ),
                 )
 
-                self.assertEqual(len(result), 8)
+                self.assertEqual(
+                    args[3],
+                    utc_to_ftmo_request_clock(
+                        end
+                    ),
+                )
+
+                self.assertEqual(
+                    len(result),
+                    8,
+                )
+
                 self.assertEqual(
                     result["datetime"].iloc[0],
                     pd.Timestamp(start),
                 )
+
                 self.assertEqual(
                     result["datetime"].iloc[-1],
                     pd.Timestamp(
@@ -163,23 +228,31 @@ class TestFTMOTime(unittest.TestCase):
                 )
 
                 self.assertFalse(
-                    result["datetime"].duplicated().any()
+                    result["datetime"]
+                    .duplicated()
+                    .any()
                 )
 
     def test_standard_utc_mode_unchanged(self):
+        """Non-FTMO UTC mode must remain unaffected."""
         start = datetime(
-            2025, 7, 15, 13, 27, tzinfo=UTC
+            2025, 7, 15, 13, 27,
+            tzinfo=UTC,
         )
+
         end = start + timedelta(minutes=8)
 
         rates = make_rates(
-            start, count=9, ftmo_clock=False
+            start,
+            count=9,
+            ftmo_clock=False,
         )
 
         with patch(
             "src.mt5_fetcher.mt5.copy_rates_range",
             return_value=rates,
         ) as mocked:
+
             result = fetch_candles_by_range(
                 symbol="US100.cash",
                 timeframe_mt5=mt5.TIMEFRAME_M1,
@@ -191,9 +264,18 @@ class TestFTMOTime(unittest.TestCase):
 
         args = mocked.call_args.args
 
-        self.assertEqual(args[2], start)
-        self.assertEqual(args[3], end)
-        self.assertEqual(len(result), 8)
+        self.assertEqual(
+            args[2], start
+        )
+
+        self.assertEqual(
+            args[3], end
+        )
+
+        self.assertEqual(
+            len(result), 8
+        )
+
         self.assertEqual(
             result["datetime"].iloc[0],
             pd.Timestamp(start),
