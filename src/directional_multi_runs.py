@@ -49,8 +49,10 @@ def _track_candidate(data, start, settings):
     start_price = float(start["start_price"])
     starting_atr = float(start["atr_at_confirmation"])
 
+    # Our start price is the reference candle's close.
+    # Its high/low cannot count as subsequent movement.
     initial = data.iloc[
-        start_index:confirmation_index + 1
+        start_index + 1:confirmation_index + 1
     ]
 
     if direction == "bullish":
