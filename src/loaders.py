@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Iterable
 
@@ -157,6 +158,94 @@ def load_candle_csv(csv_path: str | Path) -> pd.DataFrame:
     return output
 
 
+DATASET_COMPATIBILITY_FIELDS = (
+    "symbol",
+    "timeframe",
+    "broker",
+    "server",
+    "timestamp_mode",
+)
+
+
+def read_dataset_metadata(
+    csv_path: str | Path,
+) -> dict | None:
+    """Read and validate companion dataset metadata."""
+
+    csv_path = Path(csv_path)
+    metadata_path = csv_path.with_suffix(".metadata.json")
+
+    if not metadata_path.exists():
+        return None
+
+    try:
+        with metadata_path.open(
+            "r", encoding="utf-8-sig"
+        ) as file:
+            metadata = json.load(file)
+
+    except (OSError, ValueError) as error:
+        raise ValueError(
+            f"Invalid dataset metadata: {metadata_path}"
+        ) from error
+
+    if not isinstance(metadata, dict):
+        raise ValueError(
+            f"Invalid metadata structure: {metadata_path}"
+        )
+
+    for field in DATASET_COMPATIBILITY_FIELDS:
+        value = metadata.get(field)
+
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"Missing or invalid metadata field "
+                f"'{field}' in {metadata_path}"
+            )
+
+    return metadata
+
+
+def validate_dataset_compatibility(
+    csv_files: list[Path],
+) -> None:
+    """Prevent automatic merging of incompatible datasets."""
+
+    reference_metadata = None
+    reference_file = None
+
+    for csv_file in csv_files:
+        metadata = read_dataset_metadata(csv_file)
+
+        if metadata is None:
+            if len(csv_files) == 1:
+                return
+
+            raise ValueError(
+                f"Missing metadata for {csv_file.name}. "
+                "Multiple unverified datasets cannot "
+                "be safely combined."
+            )
+
+        if reference_metadata is None:
+            reference_metadata = metadata
+            reference_file = csv_file
+            continue
+
+        for field in DATASET_COMPATIBILITY_FIELDS:
+            expected = reference_metadata[field]
+            actual = metadata[field]
+
+            if expected != actual:
+                raise ValueError(
+                    f"Incompatible datasets: "
+                    f"{reference_file.name} and "
+                    f"{csv_file.name}. "
+                    f"Field '{field}' differs: "
+                    f"{expected!r} != {actual!r}"
+                )
+
+
 def load_candle_folder(
     folder: str | Path = RAW_DATA_DIR,
     pattern: str = DEFAULT_INPUT_PATTERN,
@@ -178,6 +267,8 @@ def load_candle_folder(
         raise FileNotFoundError(
             f"No CSV files found in {folder} using pattern '{pattern}'"
         )
+
+    validate_dataset_compatibility(csv_files)
 
     dataframes = []
 
