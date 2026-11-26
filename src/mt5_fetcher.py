@@ -177,6 +177,7 @@ def empty_candle_dataframe() -> pd.DataFrame:
     return pd.DataFrame(
         columns=[
             "datetime",
+            "mt5_time_raw",
             "open",
             "high",
             "low",
@@ -195,6 +196,8 @@ def rates_to_dataframe(rates, *, ftmo_athens_clock: bool = False) -> pd.DataFram
     if df.empty:
         return empty_candle_dataframe()
 
+    df["mt5_time_raw"] = df["time"].copy()
+
     if ftmo_athens_clock:
         # Broker server clock was encoded as Unix seconds. Convert to true UTC.
         # Ambiguous/nonexistent Athens timestamps fail safely.
@@ -209,6 +212,7 @@ def rates_to_dataframe(rates, *, ftmo_athens_clock: bool = False) -> pd.DataFram
     df = df[
         [
             "datetime",
+            "mt5_time_raw",
             "open",
             "high",
             "low",
