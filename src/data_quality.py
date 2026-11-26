@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from .session_filters import get_session_config, filter_by_session
@@ -323,3 +324,205 @@ def validate_session_coverage(
             and duplicate_candles == 0
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# Raw historical M1 research validation
+# ---------------------------------------------------------------------------
+
+RAW_M1_REQUIRED_COLUMNS = (
+    "datetime",
+    "mt5_time_raw",
+    "open",
+    "high",
+    "low",
+    "close",
+    "tick_volume",
+    "spread",
+    "real_volume",
+)
+
+
+def _parse_aware_timestamp(value):
+    """Parse a timestamp without assuming a missing timezone."""
+
+    try:
+        timestamp = pd.Timestamp(value)
+
+        if pd.isna(timestamp):
+            return pd.NaT
+
+        if timestamp.tzinfo is None:
+            return pd.NaT
+
+        return timestamp.tz_convert("UTC")
+
+    except (ValueError, TypeError, OverflowError):
+        return pd.NaT
+
+
+def validate_raw_m1_candles(
+    candles: pd.DataFrame,
+) -> dict:
+    """
+    Inspect raw M1 candle observations.
+
+    This function reports data-quality problems without
+    modifying, deleting, filling or reconstructing observations.
+
+    Timestamp spacing alone does not establish native M1
+    provenance or historical market coverage.
+    """
+
+    missing_columns = [
+        column
+        for column in RAW_M1_REQUIRED_COLUMNS
+        if column not in candles.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required raw candle columns: "
+            f"{missing_columns}"
+        )
+
+    data = candles.reset_index(drop=True)
+
+    # Timestamp validation
+    source = data["datetime"]
+
+    if isinstance(source.dtype, pd.DatetimeTZDtype):
+        timestamps = source.dt.tz_convert("UTC")
+    else:
+        timestamps = pd.to_datetime(
+            source.map(_parse_aware_timestamp),
+            utc=True,
+            errors="coerce",
+        )
+
+    invalid_timestamps = timestamps.isna()
+    valid_timestamps = timestamps.dropna()
+
+    non_minute_aligned = (
+        valid_timestamps
+        != valid_timestamps.dt.floor("min")
+    )
+
+    duplicate_timestamps = valid_timestamps.duplicated(
+        keep=False
+    )
+
+    # Numerical validation uses temporary arrays.
+    # The original observations remain unchanged.
+    numeric = {}
+
+    for column in (
+        "open",
+        "high",
+        "low",
+        "close",
+        "tick_volume",
+        "spread",
+        "real_volume",
+    ):
+        numeric[column] = pd.to_numeric(
+            data[column],
+            errors="coerce",
+        ).to_numpy(
+            dtype=float,
+            na_value=np.nan,
+        )
+
+    open_price = numeric["open"]
+    high_price = numeric["high"]
+    low_price = numeric["low"]
+    close_price = numeric["close"]
+
+    valid_ohlc = (
+        np.isfinite(open_price)
+        & np.isfinite(high_price)
+        & np.isfinite(low_price)
+        & np.isfinite(close_price)
+    )
+
+    invalid_relationships = valid_ohlc & (
+        (high_price < low_price)
+        | (high_price < open_price)
+        | (high_price < close_price)
+        | (low_price > open_price)
+        | (low_price > close_price)
+    )
+
+    tick_volume = numeric["tick_volume"]
+    real_volume = numeric["real_volume"]
+    spread = numeric["spread"]
+
+    negative_volume = (
+        (np.isfinite(tick_volume) & (tick_volume < 0))
+        | (np.isfinite(real_volume) & (real_volume < 0))
+    )
+
+    negative_spread = (
+        np.isfinite(spread) & (spread < 0)
+    )
+
+    invalid_volume = (
+        ~np.isfinite(tick_volume)
+        | ~np.isfinite(real_volume)
+    )
+
+    invalid_spread = ~np.isfinite(spread)
+
+    return {
+        "total_candles": len(data),
+
+        "invalid_timestamp_rows": int(
+            invalid_timestamps.sum()
+        ),
+
+        "non_minute_aligned_rows": int(
+            non_minute_aligned.sum()
+        ),
+
+        "duplicate_timestamp_rows": int(
+            duplicate_timestamps.sum()
+        ),
+
+        "is_chronologically_sorted": bool(
+            not invalid_timestamps.any()
+            and valid_timestamps.is_monotonic_increasing
+        ),
+
+        "invalid_ohlc_rows": int(
+            (~valid_ohlc).sum()
+        ),
+
+        "invalid_ohlc_relationship_rows": int(
+            invalid_relationships.sum()
+        ),
+
+        "negative_volume_rows": int(
+            negative_volume.sum()
+        ),
+
+        "negative_spread_rows": int(
+            negative_spread.sum()
+        ),
+
+        "invalid_volume_rows": int(
+            invalid_volume.sum()
+        ),
+
+        "invalid_spread_rows": int(
+            invalid_spread.sum()
+        ),
+
+        "zero_tick_volume_rows": int(
+            (tick_volume == 0).sum()
+        ),
+
+        "zero_real_volume_rows": int(
+            (real_volume == 0).sum()
+        ),
+    }
+
