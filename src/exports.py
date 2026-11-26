@@ -395,3 +395,231 @@ def verify_research_checksum(
 
     return actual == expected.lower()
 
+
+# ---------------------------------------------------------------------------
+# Permanent historical research diagnostic reports
+# ---------------------------------------------------------------------------
+
+def save_research_diagnostics(
+    output_folder: str | Path,
+    *,
+    chunk_diagnostics: list[dict],
+    duplicate_diagnostics: dict,
+    coverage: dict | None = None,
+    conflicting_rows: pd.DataFrame | None = None,
+    failure: dict | None = None,
+) -> dict:
+    """
+    Permanently save historical extraction diagnostics.
+
+    Each extraction must use a new diagnostics directory.
+    Existing reports are never overwritten.
+
+    Original conflicting observations are preserved
+    without modification or deduplication.
+
+    Optional reports are only created when supplied.
+    """
+
+    if not isinstance(chunk_diagnostics, list):
+        raise ValueError(
+            "Chunk diagnostics must be a list."
+        )
+
+    if not all(
+        isinstance(record, dict)
+        for record in chunk_diagnostics
+    ):
+        raise ValueError(
+            "Each chunk diagnostic must be a dictionary."
+        )
+
+    if not isinstance(duplicate_diagnostics, dict):
+        raise ValueError(
+            "Duplicate diagnostics must be a dictionary."
+        )
+
+    if failure is not None and not isinstance(
+        failure, dict
+    ):
+        raise ValueError(
+            "Failure diagnostics must be a dictionary."
+        )
+
+    coverage_summary = None
+    tables = {}
+
+    # Validate all optional reports before writing files.
+    if coverage is not None:
+
+        if not isinstance(coverage, dict):
+            raise ValueError(
+                "Coverage must be a dictionary."
+            )
+
+        required = (
+            "summary",
+            "daily",
+            "monthly",
+            "gaps",
+        )
+
+        missing = [
+            field
+            for field in required
+            if field not in coverage
+        ]
+
+        if missing:
+            raise ValueError(
+                f"Missing coverage fields: {missing}"
+            )
+
+        coverage_summary = coverage["summary"]
+
+        if not isinstance(coverage_summary, dict):
+            raise ValueError(
+                "Coverage summary must be a dictionary."
+            )
+
+        coverage_files = {
+            "daily_coverage.csv": coverage["daily"],
+            "monthly_coverage.csv": coverage["monthly"],
+            "historical_gaps.csv": coverage["gaps"],
+        }
+
+        for filename, dataframe in coverage_files.items():
+
+            if not isinstance(dataframe, pd.DataFrame):
+                raise ValueError(
+                    f"Invalid coverage table: {filename}"
+                )
+
+            tables[filename] = dataframe
+
+    if conflicting_rows is not None:
+
+        if not isinstance(
+            conflicting_rows,
+            pd.DataFrame,
+        ):
+            raise ValueError(
+                "Conflicting observations must be "
+                "a DataFrame."
+            )
+
+        if not conflicting_rows.empty:
+
+            from .data_quality import (
+                RAW_M1_REQUIRED_COLUMNS
+            )
+
+            missing = [
+                column
+                for column in RAW_M1_REQUIRED_COLUMNS
+                if column not in conflicting_rows.columns
+            ]
+
+            if missing:
+                raise ValueError(
+                    f"Missing conflict evidence columns: "
+                    f"{missing}"
+                )
+
+            tables["conflicting_candles.csv"] = (
+                conflicting_rows
+            )
+
+    payload = {
+        "diagnostics_schema_version": 1,
+
+        "chunk_diagnostics": chunk_diagnostics,
+
+        "duplicate_diagnostics": duplicate_diagnostics,
+
+        "coverage_summary": coverage_summary,
+
+        "failure": failure,
+
+        "report_files": list(tables.keys()),
+    }
+
+    # Serialize before creating the output directory.
+    # Reject invalid JSON values rather than silently
+    # replacing them.
+    serialized = json.dumps(
+        payload,
+        indent=4,
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+    folder = Path(output_folder)
+
+    # Exclusive directory creation prevents mixing
+    # evidence from separate extraction attempts.
+    folder.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+    written_paths = []
+
+    try:
+
+        for filename, dataframe in tables.items():
+
+            file_path = folder / filename
+
+            file = file_path.open(
+                mode="x",
+                encoding="utf-8",
+                newline="",
+            )
+
+            written_paths.append(file_path)
+
+            with file:
+                dataframe.to_csv(
+                    file,
+                    index=False,
+                )
+
+        # Write the diagnostic manifest last.
+        diagnostics_path = (
+            folder / "diagnostics.json"
+        )
+
+        file = diagnostics_path.open(
+            mode="x",
+            encoding="utf-8",
+            newline="",
+        )
+
+        written_paths.append(diagnostics_path)
+
+        with file:
+            file.write(serialized + chr(10))
+
+    except Exception:
+
+        # Remove incomplete files created by this call.
+        # Never delete pre-existing extraction evidence.
+        for file_path in reversed(written_paths):
+            file_path.unlink(missing_ok=True)
+
+        if not any(folder.iterdir()):
+            folder.rmdir()
+
+        raise
+
+    return {
+        "output_folder": folder,
+        "diagnostics_path": diagnostics_path,
+        "report_paths": {
+            filename: folder / filename
+            for filename in tables
+        },
+        "files_saved": len(written_paths),
+    }
+
