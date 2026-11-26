@@ -1144,3 +1144,330 @@ def build_research_coverage_report(
         "gaps": gaps,
     }
 
+
+# ---------------------------------------------------------------------------
+# Historical timeframe integrity validation
+# ---------------------------------------------------------------------------
+
+def validate_historical_timeframe(
+    candles: pd.DataFrame,
+) -> dict:
+    """
+    Detect statistical evidence of historical timeframe
+    inconsistencies without modifying observations.
+
+    Timestamp spacing alone cannot prove native
+    candle timeframe or historical completeness.
+    """
+
+    MIN_HOURLY_OBSERVATIONS = 24
+    MIN_HOURLY_INTERVAL_RATIO = 0.70
+    MIN_MINUTE_RUN = 60
+
+    if "datetime" not in candles.columns:
+        raise ValueError(
+            "Missing required datetime column."
+        )
+
+    source = candles["datetime"].reset_index(drop=True)
+
+    if isinstance(source.dtype, pd.DatetimeTZDtype):
+
+        timestamps = source.dt.tz_convert("UTC")
+
+    else:
+
+        timestamps = pd.to_datetime(
+            source.map(_parse_aware_timestamp),
+            utc=True,
+            errors="coerce",
+        )
+
+    if timestamps.isna().any():
+        raise ValueError(
+            "Invalid or timezone-naive timestamps."
+        )
+
+    if timestamps.duplicated().any():
+        raise ValueError(
+            "Duplicate timestamps detected."
+        )
+
+    if not timestamps.is_monotonic_increasing:
+        raise ValueError(
+            "Timestamps must be chronologically sorted."
+        )
+
+    if (
+        timestamps != timestamps.dt.floor("min")
+    ).any():
+        raise ValueError(
+            "Non-minute-aligned timestamps detected."
+        )
+
+    total = len(timestamps)
+
+    intervals = (
+        timestamps.diff()
+        .dt.total_seconds()
+        .div(60)
+    )
+
+    hourly_aligned = (
+        timestamps.dt.minute == 0
+    )
+
+    non_hourly = timestamps.loc[
+        ~hourly_aligned
+    ]
+
+    first_non_hourly = (
+        non_hourly.iloc[0].isoformat()
+        if not non_hourly.empty
+        else None
+    )
+
+    # ---------------------------------------------------
+    # Consecutive minute-level activity
+    # ---------------------------------------------------
+
+    minute_intervals = int(
+        intervals.eq(1).sum()
+    )
+
+    longest_minute_run = 0
+
+    if total:
+
+        minute_groups = (
+            intervals.ne(1).cumsum()
+        )
+
+        longest_minute_run = int(
+            minute_groups.value_counts().max()
+        )
+
+    has_minute_evidence = (
+        longest_minute_run >= MIN_MINUTE_RUN
+    )
+
+    # ---------------------------------------------------
+    # Detect uninterrupted regions of hour-aligned
+    # observations.
+    #
+    # Weekend and other longer gaps are permitted,
+    # provided that enough intervals are exactly 60
+    # minutes apart.
+    # ---------------------------------------------------
+
+    hourly_regions = []
+
+    # Hour-aligned candles may still belong to
+    # consecutive minute-level activity.
+    #
+    # Exclude observations with an immediately
+    # preceding or following one-minute interval
+    # from suspicious hourly region detection.
+
+    adjacent_minute_evidence = (
+        intervals.eq(1)
+        | intervals.shift(-1).eq(1)
+    )
+
+    hourly_candidates = (
+        hourly_aligned
+        & ~adjacent_minute_evidence
+    )
+
+    hourly_positions = np.flatnonzero(
+        hourly_candidates.to_numpy()
+    )
+
+    if len(hourly_positions):
+
+        split_positions = np.flatnonzero(
+            np.diff(hourly_positions) != 1
+        ) + 1
+
+        candidate_regions = np.split(
+            hourly_positions,
+            split_positions,
+        )
+
+        for positions in candidate_regions:
+
+            count = len(positions)
+
+            if count < MIN_HOURLY_OBSERVATIONS:
+                continue
+
+            region_times = timestamps.iloc[
+                positions
+            ]
+
+            region_intervals = (
+                region_times.diff()
+                .dt.total_seconds()
+                .div(60)
+                .dropna()
+            )
+
+            hourly_interval_count = int(
+                region_intervals.eq(60).sum()
+            )
+
+            hourly_ratio = (
+                hourly_interval_count
+                / len(region_intervals)
+            )
+
+            if hourly_ratio < MIN_HOURLY_INTERVAL_RATIO:
+                continue
+
+            hourly_regions.append({
+                "first_datetime_utc": (
+                    region_times.iloc[0].isoformat()
+                ),
+
+                "last_datetime_utc": (
+                    region_times.iloc[-1].isoformat()
+                ),
+
+                "observation_count": count,
+
+                "first_row_position": int(
+                    positions[0]
+                ),
+
+                "last_row_position": int(
+                    positions[-1]
+                ),
+
+                "hourly_interval_count": (
+                    hourly_interval_count
+                ),
+
+                "hourly_interval_ratio": float(
+                    hourly_ratio
+                ),
+
+                "classification": "suspected_hourly",
+            })
+
+    suspected_hourly_rows = sum(
+        region["observation_count"]
+        for region in hourly_regions
+    )
+
+    has_hourly_evidence = bool(hourly_regions)
+
+    # ---------------------------------------------------
+    # Evidence-based classification
+    # ---------------------------------------------------
+
+    if total == 0:
+
+        classification = "no_observations"
+
+    elif has_hourly_evidence and has_minute_evidence:
+
+        classification = "possible_mixed_timeframe"
+
+    elif has_hourly_evidence:
+
+        classification = "suspected_hourly"
+
+    elif has_minute_evidence:
+
+        classification = "minute_level_evidence"
+
+    else:
+
+        classification = "insufficient_evidence"
+
+    warnings = []
+
+    if has_hourly_evidence:
+
+        warnings.append(
+            "Suspicious hourly observation regions "
+            "detected in data requested as M1."
+        )
+
+    if classification == "insufficient_evidence":
+
+        warnings.append(
+            "Insufficient statistical evidence to "
+            "determine historical candle timeframe."
+        )
+
+    if classification == "no_observations":
+
+        warnings.append(
+            "No observations available for "
+            "timeframe validation."
+        )
+
+    return {
+        "classification": classification,
+
+        "requested_timeframe": "M1",
+
+        "total_observations": total,
+
+        "hour_aligned_observations": int(
+            hourly_aligned.sum()
+        ),
+
+        "non_hour_aligned_observations": len(
+            non_hourly
+        ),
+
+        "first_non_hourly_utc": first_non_hourly,
+
+        "consecutive_minute_intervals": (
+            minute_intervals
+        ),
+
+        "longest_minute_run": longest_minute_run,
+
+        "has_minute_level_evidence": (
+            has_minute_evidence
+        ),
+
+        "has_suspected_hourly_evidence": (
+            has_hourly_evidence
+        ),
+
+        "suspected_hourly_rows": (
+            suspected_hourly_rows
+        ),
+
+        "suspected_hourly_regions": hourly_regions,
+
+        "native_m1_proven": False,
+
+        "cross_timeframe_verification_performed": False,
+
+        "detection_thresholds": {
+            "minimum_hourly_observations": (
+                MIN_HOURLY_OBSERVATIONS
+            ),
+
+            "minimum_hourly_interval_ratio": (
+                MIN_HOURLY_INTERVAL_RATIO
+            ),
+
+            "minimum_minute_run": MIN_MINUTE_RUN,
+        },
+
+        "warnings": warnings,
+
+        "limitation": (
+            "Timestamp spacing provides statistical "
+            "evidence only. Independent cross-timeframe "
+            "verification is required for stronger "
+            "historical timeframe validation."
+        ),
+    }
+
