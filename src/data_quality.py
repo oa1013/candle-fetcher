@@ -1471,3 +1471,474 @@ def validate_historical_timeframe(
         ),
     }
 
+
+# ---------------------------------------------------------------------------
+# Cross-timeframe historical verification
+# ---------------------------------------------------------------------------
+
+TIMEFRAME_OHLC_FIELDS = [
+    "open",
+    "high",
+    "low",
+    "close",
+]
+
+TIMEFRAME_DIRECT_FIELDS = [
+    "open",
+    "high",
+    "low",
+    "close",
+    "tick_volume",
+    "spread",
+    "real_volume",
+]
+
+TIMEFRAME_AGGREGATION_FIELDS = [
+    "open",
+    "high",
+    "low",
+    "close",
+    "tick_volume",
+    "real_volume",
+]
+
+
+def _prepare_timeframe_reference(
+    candles: pd.DataFrame,
+    timeframe: str,
+) -> pd.DataFrame:
+    """
+    Validate and copy observations for comparison.
+    Original observations remain unchanged.
+    """
+
+    required = [
+        "datetime",
+        *TIMEFRAME_DIRECT_FIELDS,
+    ]
+
+    if candles.columns.duplicated().any():
+        raise ValueError(
+            f"{timeframe}: Duplicate column names."
+        )
+
+    missing = [
+        field
+        for field in required
+        if field not in candles.columns
+    ]
+
+    if missing:
+        raise ValueError(
+            f"{timeframe}: Missing required fields: {missing}"
+        )
+
+    prepared = candles[required].copy()
+    prepared = prepared.reset_index(drop=True)
+
+    source = prepared["datetime"]
+
+    if isinstance(source.dtype, pd.DatetimeTZDtype):
+
+        timestamps = source.dt.tz_convert("UTC")
+
+    else:
+
+        timestamps = pd.to_datetime(
+            source.map(_parse_aware_timestamp),
+            utc=True,
+            errors="coerce",
+        )
+
+    if timestamps.isna().any():
+        raise ValueError(
+            f"{timeframe}: Invalid or naive timestamps."
+        )
+
+    if timestamps.duplicated().any():
+        raise ValueError(
+            f"{timeframe}: Duplicate timestamps."
+        )
+
+    if not timestamps.is_monotonic_increasing:
+        raise ValueError(
+            f"{timeframe}: Unsorted timestamps."
+        )
+
+    frequency = (
+        "h" if timeframe == "H1" else "min"
+    )
+
+    if (
+        timestamps != timestamps.dt.floor(frequency)
+    ).any():
+
+        raise ValueError(
+            f"{timeframe}: Incorrect timestamp alignment."
+        )
+
+    prepared["datetime"] = timestamps
+
+    for field in TIMEFRAME_DIRECT_FIELDS:
+
+        values = prepared[field]
+
+        if values.empty:
+            continue
+
+        if (
+            not pd.api.types.is_numeric_dtype(values)
+            or pd.api.types.is_bool_dtype(values)
+            or pd.api.types.is_complex_dtype(values)
+        ):
+            raise ValueError(
+                f"{timeframe}: Non-numeric values in {field}."
+            )
+
+        if (
+            values.isna().any()
+            or not np.isfinite(values).all()
+        ):
+            raise ValueError(
+                f"{timeframe}: Invalid values in {field}."
+            )
+
+        if field in [
+            "tick_volume",
+            "real_volume",
+            "spread",
+        ]:
+
+            if (
+                values.lt(0).any()
+                or values.mod(1).ne(0).any()
+            ):
+                raise ValueError(
+                    f"{timeframe}: Invalid integer values "
+                    f"in {field}."
+                )
+
+    invalid_ohlc = (
+        prepared["high"].lt(prepared["low"])
+        | prepared["high"].lt(prepared["open"])
+        | prepared["high"].lt(prepared["close"])
+        | prepared["low"].gt(prepared["open"])
+        | prepared["low"].gt(prepared["close"])
+    )
+
+    if invalid_ohlc.any():
+        raise ValueError(
+            f"{timeframe}: Invalid OHLC relationships."
+        )
+
+    return prepared.set_index("datetime")
+
+
+def _compare_timeframe_values(
+    observations: pd.DataFrame,
+    reference: pd.DataFrame,
+    fields: list[str],
+) -> dict:
+    """
+    Compare exact field values at shared timestamps.
+    """
+
+    common = observations.index.intersection(
+        reference.index
+    )
+
+    exact = pd.Series(
+        True,
+        index=common,
+        dtype=bool,
+    )
+
+    ohlc_exact = exact.copy()
+
+    field_matches = {}
+
+    for field in fields:
+
+        equal = (
+            observations.loc[common, field]
+            .eq(reference.loc[common, field])
+            .fillna(False)
+        )
+
+        field_matches[field] = int(equal.sum())
+
+        exact &= equal
+
+        if field in TIMEFRAME_OHLC_FIELDS:
+            ohlc_exact &= equal
+
+    exact_count = int(exact.sum())
+
+    return {
+        "shared_timestamps": len(common),
+
+        "observations_without_reference": (
+            len(observations) - len(common)
+        ),
+
+        "field_matches": field_matches,
+
+        "ohlc_matches": int(ohlc_exact.sum()),
+
+        "exact_matches": exact_count,
+
+        "mismatched_shared_observations": (
+            len(common) - exact_count
+        ),
+
+        "exact_match_ratio": (
+            exact_count / len(common)
+            if len(common)
+            else None
+        ),
+
+        "exact_match_timestamps_utc": [
+            timestamp.isoformat()
+            for timestamp in exact.index[exact]
+        ],
+    }
+
+
+def verify_historical_timeframe(
+    m1_candles: pd.DataFrame,
+    h1_candles: pd.DataFrame,
+) -> dict:
+    """
+    Compare observations requested as M1 against
+    separately supplied H1 reference observations.
+
+    Aggregation is performed only for verification.
+
+    Inputs must represent the same instrument,
+    broker, server and corrected UTC clock.
+
+    This function does not independently establish
+    source provenance or absolute market completeness.
+    """
+
+    m1 = _prepare_timeframe_reference(
+        m1_candles,
+        "M1",
+    )
+
+    h1 = _prepare_timeframe_reference(
+        h1_candles,
+        "H1",
+    )
+
+    statistical = validate_historical_timeframe(
+        m1.reset_index()
+    )
+
+    # ---------------------------------------------------
+    # Check A: Direct comparisons at shared timestamps
+    # ---------------------------------------------------
+
+    direct = _compare_timeframe_values(
+        m1,
+        h1,
+        TIMEFRAME_DIRECT_FIELDS,
+    )
+
+    # ---------------------------------------------------
+    # Verify each suspicious hourly region separately
+    # ---------------------------------------------------
+
+    verified_regions = []
+
+    for region in statistical[
+        "suspected_hourly_regions"
+    ]:
+
+        first = region["first_row_position"]
+        last = region["last_row_position"]
+
+        observations = m1.iloc[
+            first:last + 1
+        ]
+
+        comparison = _compare_timeframe_values(
+            observations,
+            h1,
+            TIMEFRAME_DIRECT_FIELDS,
+        )
+
+        verified_regions.append({
+            **region,
+            **comparison,
+        })
+
+    # ---------------------------------------------------
+    # Check B: Temporary aggregation of complete hours
+    #
+    # Unique, aligned minute timestamps mean that
+    # exactly 60 observations in one UTC hour
+    # represent every minute of that hour.
+    # ---------------------------------------------------
+
+    grouped = m1.groupby(
+        m1.index.floor("h"),
+        sort=True,
+    )
+
+    aggregated = grouped.agg(
+        candles=("open", "size"),
+
+        open=("open", "first"),
+
+        high=("high", "max"),
+
+        low=("low", "min"),
+
+        close=("close", "last"),
+
+        tick_volume=(
+            "tick_volume",
+            lambda values: sum(
+                int(value) for value in values
+            ),
+        ),
+
+        real_volume=(
+            "real_volume",
+            lambda values: sum(
+                int(value) for value in values
+            ),
+        ),
+    )
+
+    complete = aggregated.loc[
+        aggregated["candles"].eq(60)
+    ]
+
+    aggregation_comparison = (
+        _compare_timeframe_values(
+            complete,
+            h1,
+            TIMEFRAME_AGGREGATION_FIELDS,
+        )
+    )
+
+    aggregation_comparison.update({
+        "complete_groups": len(complete),
+
+        "incomplete_groups": (
+            len(aggregated) - len(complete)
+        ),
+
+        "comparable_groups": (
+            aggregation_comparison["shared_timestamps"]
+        ),
+
+        "spread_compared": False,
+    })
+
+    # ---------------------------------------------------
+    # Evidence and limitations
+    # ---------------------------------------------------
+
+    warnings = list(
+        statistical["warnings"]
+    )
+
+    if h1.empty:
+
+        warnings.append(
+            "No H1 reference observations available."
+        )
+
+    if direct["exact_matches"]:
+
+        warnings.append(
+            "Exact H1 candle matches detected in "
+            "observations requested as M1. "
+            "These require timeframe interpretation."
+        )
+
+    if (
+        aggregation_comparison[
+            "mismatched_shared_observations"
+        ] > 0
+    ):
+
+        warnings.append(
+            "Some complete minute groups do not "
+            "match their H1 reference candles."
+        )
+
+    if (
+        not m1.empty
+        and aggregation_comparison[
+            "comparable_groups"
+        ] == 0
+    ):
+
+        warnings.append(
+            "No complete minute groups could be "
+            "verified against H1 reference candles."
+        )
+
+    if aggregation_comparison[
+        "observations_without_reference"
+    ]:
+
+        warnings.append(
+            "Some complete minute groups have "
+            "no corresponding H1 reference candle."
+        )
+
+    comparison_performed = bool(
+        direct["shared_timestamps"]
+        or aggregation_comparison[
+            "comparable_groups"
+        ]
+    )
+
+    return {
+        "requested_timeframe": "M1",
+
+        "reference_timeframe": "H1",
+
+        "total_observations": len(m1),
+
+        "reference_observations": len(h1),
+
+        "statistical_classification": (
+            statistical["classification"]
+        ),
+
+        "statistical_validation": statistical,
+
+        "direct_comparison": direct,
+
+        "suspected_hourly_regions": verified_regions,
+
+        "aggregation_comparison": (
+            aggregation_comparison
+        ),
+
+        "cross_timeframe_verification_performed": (
+            comparison_performed
+        ),
+
+        "native_m1_proven": False,
+
+        "source_provenance_verified": False,
+
+        "historical_completeness_verified": False,
+
+        "warnings": warnings,
+
+        "limitation": (
+            "Cross-timeframe matches provide evidence "
+            "of candle timeframe but do not guarantee "
+            "the provenance or completeness of every "
+            "historical observation."
+        ),
+    }
+
