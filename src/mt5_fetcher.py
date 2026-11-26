@@ -241,6 +241,7 @@ def fetch_candles_by_range(
     chunk_days: int = 31,
     *,
     ftmo_athens_clock: bool = False,
+    diagnostics: list[dict] | None = None,
 ) -> pd.DataFrame:
     """
     Fetch candles from MT5 between explicit UTC datetimes.
@@ -289,6 +290,22 @@ def fetch_candles_by_range(
                 "This interval cannot be requested safely by wall-clock alone."
             )
 
+        record = {
+            "requested_start_utc": chunk_start.astimezone(UTC_TZ).isoformat(),
+            "requested_end_utc_exclusive": chunk_end.astimezone(UTC_TZ).isoformat(),
+            "mt5_request_start": request_start.isoformat(),
+            "mt5_request_end_inclusive": request_end.isoformat(),
+            "status": "pending",
+            "rows_returned": 0,
+            "first_datetime_utc": None,
+            "last_datetime_utc": None,
+            "mt5_error": None,
+            "retry_attempts": 0,
+        }
+
+        if diagnostics is not None:
+            diagnostics.append(record)
+
         rates = mt5.copy_rates_range(
             symbol,
             timeframe_mt5,
@@ -297,23 +314,49 @@ def fetch_candles_by_range(
         )
 
         if rates is None:
+            error = mt5.last_error()
+
+            record["status"] = "failed"
+            record["mt5_error"] = error
+
             raise RuntimeError(
                 f"MT5 failed to fetch candles for chunk "
                 f"{chunk_start:%Y-%m-%d %H:%M} -> "
                 f"{chunk_end:%Y-%m-%d %H:%M} UTC. "
-                f"MT5 error: {mt5.last_error()}"
+                f"MT5 error: {error}"
             )
 
         elif len(rates) == 0:
+            record["status"] = "empty"
+
             print(
                 "WARNING: MT5 returned zero candles for this chunk. "
                 "This may be due to market closure or missing historical data."
             )
 
         else:
-            chunks.append(
-                rates_to_dataframe(rates, ftmo_athens_clock=ftmo_athens_clock)
+            record["rows_returned"] = len(rates)
+
+            try:
+                chunk_df = rates_to_dataframe(
+                    rates,
+                    ftmo_athens_clock=ftmo_athens_clock,
+                )
+            except Exception:
+                record["status"] = "conversion_failed"
+                raise
+
+            record["status"] = "returned"
+
+            record["first_datetime_utc"] = (
+                chunk_df["datetime"].min().isoformat()
             )
+
+            record["last_datetime_utc"] = (
+                chunk_df["datetime"].max().isoformat()
+            )
+
+            chunks.append(chunk_df)
 
         # Always advance to the next chunk.
         chunk_start = chunk_end
