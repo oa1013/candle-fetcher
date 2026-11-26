@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from datetime import datetime
 from pathlib import Path
@@ -256,4 +258,140 @@ def save_raw_research_csv(
         raise
 
     return output_path
+
+
+# ---------------------------------------------------------------------------
+# Research provenance and checksum verification
+# ---------------------------------------------------------------------------
+
+def compute_file_sha256(
+    file_path: str | Path,
+) -> str:
+    """Calculate the SHA-256 fingerprint of a file."""
+
+    file_path = Path(file_path)
+    digest = hashlib.sha256()
+
+    with file_path.open("rb") as file:
+        for block in iter(
+            lambda: file.read(1024 * 1024),
+            b"",
+        ):
+            digest.update(block)
+
+    return digest.hexdigest()
+
+
+def save_research_metadata(
+    csv_path: str | Path,
+    metadata: dict,
+) -> Path:
+    """
+    Save companion research metadata without overwriting
+    an existing metadata file.
+
+    The original metadata dictionary remains unchanged.
+    """
+
+    from .loaders import DATASET_COMPATIBILITY_FIELDS
+
+    csv_path = Path(csv_path)
+
+    if not csv_path.is_file():
+        raise FileNotFoundError(
+            f"Research CSV not found: {csv_path}"
+        )
+
+    if not isinstance(metadata, dict):
+        raise ValueError("Research metadata must be a dictionary.")
+
+    for field in DATASET_COMPATIBILITY_FIELDS:
+        value = metadata.get(field)
+
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"Missing or invalid provenance field: {field}"
+            )
+
+    payload = dict(metadata)
+
+    payload["csv_filename"] = csv_path.name
+    payload["sha256"] = compute_file_sha256(csv_path)
+    payload["metadata_schema_version"] = 1
+
+    # Serialize before opening the destination file.
+    # Invalid metadata must not create a partial sidecar.
+    serialized = json.dumps(
+        payload,
+        indent=4,
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+    metadata_path = csv_path.with_suffix(".metadata.json")
+
+    file = metadata_path.open(
+        mode="x",
+        encoding="utf-8",
+        newline="",
+    )
+
+    try:
+        with file:
+            file.write(serialized + "\n")
+
+    except Exception:
+        metadata_path.unlink(missing_ok=True)
+        raise
+
+    return metadata_path
+
+
+def verify_research_checksum(
+    csv_path: str | Path,
+) -> bool:
+    """
+    Compare a CSV against its recorded SHA-256 checksum.
+
+    Returns True if the fingerprint matches and False
+    if the CSV contents have changed.
+
+    Missing or invalid metadata raises an exception.
+    """
+
+    from .loaders import read_dataset_metadata
+
+    csv_path = Path(csv_path)
+
+    if not csv_path.is_file():
+        raise FileNotFoundError(
+            f"Research CSV not found: {csv_path}"
+        )
+
+    metadata = read_dataset_metadata(csv_path)
+
+    if metadata is None:
+        raise FileNotFoundError(
+            f"Research metadata not found: "
+            f"{csv_path.with_suffix('.metadata.json')}"
+        )
+
+    expected = metadata.get("sha256")
+
+    if (
+        not isinstance(expected, str)
+        or re.fullmatch(r"[0-9a-fA-F]{64}", expected) is None
+    ):
+        raise ValueError(
+            "Missing or invalid SHA256 checksum."
+        )
+
+    if metadata.get("csv_filename") != csv_path.name:
+        raise ValueError(
+            "Metadata CSV filename does not match."
+        )
+
+    actual = compute_file_sha256(csv_path)
+
+    return actual == expected.lower()
 
