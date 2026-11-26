@@ -183,3 +183,77 @@ def print_export_summary(result: dict) -> None:
     print(f"Rows saved: {result['rows_saved']:,}")
     print(f"Filename: {result['filename']}")
     print(f"Path: {result['output_path']}")
+
+
+# ---------------------------------------------------------------------------
+# Raw historical research exports
+# ---------------------------------------------------------------------------
+
+def save_raw_research_csv(
+    df: pd.DataFrame,
+    output_folder: str | Path,
+    filename: str,
+) -> Path:
+    """
+    Save original historical M1 observations to CSV.
+
+    No session filtering, resampling, interpolation,
+    rounding, filling or observation removal is performed.
+
+    Existing files are never overwritten.
+    """
+
+    from .data_quality import RAW_M1_REQUIRED_COLUMNS
+
+    missing_columns = [
+        column
+        for column in RAW_M1_REQUIRED_COLUMNS
+        if column not in df.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required raw candle columns: "
+            f"{missing_columns}"
+        )
+
+    filename = str(filename)
+
+    if (
+        Path(filename).name != filename
+        or not filename.lower().endswith(".csv")
+    ):
+        raise ValueError(
+            "Provide a valid CSV filename without "
+            "directory components."
+        )
+
+    output_folder = Path(output_folder)
+    output_folder.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    output_path = output_folder / filename
+
+    # Exclusive creation prevents accidental overwriting.
+    file = output_path.open(
+        mode="x",
+        encoding="utf-8",
+        newline="",
+    )
+
+    try:
+        with file:
+            df.to_csv(
+                file,
+                index=False,
+            )
+
+    except Exception:
+        # Remove an incomplete export if writing fails.
+        output_path.unlink(missing_ok=True)
+        raise
+
+    return output_path
+
