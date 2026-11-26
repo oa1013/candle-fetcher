@@ -21,6 +21,14 @@ AS_OF = datetime(
 CSV_NAME = "US100.cash_M1_2025.csv"
 METADATA_NAME = "US100.cash_M1_2025.metadata.json"
 
+QUARANTINE_CSV_NAME = (
+    "US100.cash_M1_requested_2025.csv"
+)
+
+QUARANTINE_METADATA_NAME = (
+    "US100.cash_M1_requested_2025.metadata.json"
+)
+
 
 @pytest.fixture
 def connection(monkeypatch):
@@ -93,6 +101,22 @@ def connection(monkeypatch):
 
     def fake_fetch(**kwargs):
 
+        if kwargs["timeframe_mt5"] == (
+            mt5_fetcher.mt5.TIMEFRAME_H1
+        ):
+
+            kwargs["diagnostics"].append({
+                "status": "empty",
+                "rows_returned": 0,
+                "mt5_error": None,
+            })
+
+            return mt5_fetcher.empty_candle_dataframe()
+
+        assert kwargs["timeframe_mt5"] == (
+            mt5_fetcher.mt5.TIMEFRAME_M1
+        )
+
         kwargs["diagnostics"].append({
             "status": (
                 "empty"
@@ -141,13 +165,28 @@ def test_complete_annual_export(
 
     original = connection.candles.copy(deep=True)
 
-    run_export(tmp_path)
+    result = run_export(tmp_path)
 
-    folder = tmp_path / "2025"
-    csv_path = folder / CSV_NAME
+    annual_folder = tmp_path / "2025"
+    folder = annual_folder / "quarantine"
+
+    csv_path = folder / QUARANTINE_CSV_NAME
 
     assert csv_path.is_file()
-    assert (folder / METADATA_NAME).is_file()
+
+    assert (
+        folder / QUARANTINE_METADATA_NAME
+    ).is_file()
+
+    assert result["m1_export_path"] is None
+    assert result["quarantine_path"] == csv_path
+
+    assert not (annual_folder / CSV_NAME).exists()
+    assert not (annual_folder / METADATA_NAME).exists()
+
+    assert result["timeframe_decision"]["status"] == (
+        "review_required"
+    )
 
     restored = pd.read_csv(
         csv_path,
@@ -167,8 +206,8 @@ def test_complete_annual_export(
 
     assert verify_research_checksum(csv_path)
 
-    connection.initialize.assert_called_once()
-    connection.shutdown.assert_called_once()
+    assert connection.initialize.call_count == 2
+    assert connection.shutdown.call_count == 2
 
     pd.testing.assert_frame_equal(
         connection.candles,
@@ -185,11 +224,16 @@ def test_metadata_contains_research_provenance(
     run_export(tmp_path)
 
     metadata = read_json(
-        tmp_path / "2025" / METADATA_NAME
+        tmp_path
+        / "2025"
+        / "quarantine"
+        / QUARANTINE_METADATA_NAME
     )
 
     assert metadata["symbol"] == "US100.cash"
-    assert metadata["timeframe"] == "M1"
+    assert metadata["requested_timeframe"] == "M1"
+    assert metadata["timeframe"] == "unverified"
+    assert metadata["quarantined"] is True
     assert metadata["server"] == "FTMO-Server3"
 
     assert metadata["broker"] == (
@@ -198,7 +242,13 @@ def test_metadata_contains_research_provenance(
 
     assert metadata["year"] == 2025
     assert metadata["rows_exported"] == 2
-    assert metadata["data_status"] == "observations_available"
+    assert metadata["data_status"] == "review_required"
+
+    assert "missing_h1_reference" in (
+        metadata["timeframe_decision"]["blocking_reasons"]
+    )
+
+    assert metadata["native_m1_proven"] is False
 
     assert metadata["timestamp_mode"] == "ftmo_server"
     assert metadata["session_filter"] is None
@@ -290,19 +340,31 @@ def test_empty_history_explicitly_reported(
         connection.candles.iloc[:0].copy()
     )
 
-    run_export(tmp_path)
+    result = run_export(tmp_path)
 
-    folder = tmp_path / "2025"
+    annual_folder = tmp_path / "2025"
+    folder = annual_folder / "quarantine"
 
-    restored = pd.read_csv(
-        folder / CSV_NAME
-    )
+    csv_path = folder / QUARANTINE_CSV_NAME
+
+    restored = pd.read_csv(csv_path)
 
     assert restored.empty
+    assert verify_research_checksum(csv_path)
+
+    assert result["m1_export_path"] is None
+    assert not (annual_folder / CSV_NAME).exists()
+
+    assert result["timeframe_decision"]["status"] == (
+        "no_observations"
+    )
 
     metadata = read_json(
-        folder / METADATA_NAME
+        folder / QUARANTINE_METADATA_NAME
     )
+
+    connection.initialize.assert_called_once()
+    connection.shutdown.assert_called_once()
 
     assert metadata["rows_exported"] == 0
     assert metadata["data_status"] == "no_observations"
@@ -343,6 +405,10 @@ def test_invalid_dataset_blocks_export(
     folder = tmp_path / "2025"
 
     assert not (folder / CSV_NAME).exists()
+
+    assert not list(
+        (folder / "quarantine").glob("*.csv")
+    )
 
     assert not (
         folder / METADATA_NAME
@@ -387,6 +453,10 @@ def test_fetch_failure_diagnostics_retained(
     folder = tmp_path / "2025"
 
     assert not (folder / CSV_NAME).exists()
+
+    assert not list(
+        (folder / "quarantine").glob("*.csv")
+    )
 
     payload = read_json(
         folder
@@ -443,6 +513,10 @@ def test_conflict_evidence_saved(
 
     assert not (folder / CSV_NAME).exists()
 
+    assert not list(
+        (folder / "quarantine").glob("*.csv")
+    )
+
     restored = pd.read_csv(
         folder
         / "diagnostics"
@@ -467,15 +541,21 @@ def test_existing_year_never_overwritten(
     connection,
 ):
 
-    run_export(tmp_path)
+    result = run_export(tmp_path)
 
-    csv_path = tmp_path / "2025" / CSV_NAME
+    csv_path = result["quarantine_path"]
+    metadata_path = result["metadata_path"]
 
     original = csv_path.read_bytes()
+    original_metadata = metadata_path.read_bytes()
 
     with pytest.raises(FileExistsError):
         run_export(tmp_path)
 
     assert csv_path.read_bytes() == original
+    assert metadata_path.read_bytes() == original_metadata
 
-    connection.initialize.assert_called_once()
+    assert verify_research_checksum(csv_path)
+
+    assert connection.initialize.call_count == 2
+    assert connection.shutdown.call_count == 2

@@ -408,6 +408,11 @@ def save_research_diagnostics(
     coverage: dict | None = None,
     conflicting_rows: pd.DataFrame | None = None,
     failure: dict | None = None,
+    timeframe_verification: dict | None = None,
+    timeframe_decision: dict | None = None,
+    h1_reference: dict | None = None,
+    h1_candles: pd.DataFrame | None = None,
+    h1_conflicting_rows: pd.DataFrame | None = None,
 ) -> dict:
     """
     Permanently save historical extraction diagnostics.
@@ -530,6 +535,25 @@ def save_research_diagnostics(
                 conflicting_rows
             )
 
+    # Preserve separately requested H1 observations
+    # and any conflicting reference evidence.
+
+    reference_tables = {
+        "h1_reference_candles.csv": h1_candles,
+        "h1_conflicting_candles.csv": h1_conflicting_rows,
+    }
+
+    for filename, dataframe in reference_tables.items():
+
+        if dataframe is not None:
+
+            if not isinstance(dataframe, pd.DataFrame):
+                raise ValueError(
+                    f"Invalid reference evidence: {filename}"
+                )
+
+            tables[filename] = dataframe
+
     payload = {
         "diagnostics_schema_version": 1,
 
@@ -543,6 +567,23 @@ def save_research_diagnostics(
 
         "report_files": list(tables.keys()),
     }
+
+    additional_reports = {
+        "timeframe_verification": timeframe_verification,
+        "timeframe_decision": timeframe_decision,
+        "h1_reference": h1_reference,
+    }
+
+    for name, report in additional_reports.items():
+
+        if report is not None:
+
+            if not isinstance(report, dict):
+                raise ValueError(
+                    f"Invalid diagnostic report: {name}"
+                )
+
+            payload[name] = report
 
     # Serialize before creating the output directory.
     # Reject invalid JSON values rather than silently

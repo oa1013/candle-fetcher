@@ -115,6 +115,10 @@ def terminal(monkeypatch):
 
         assert symbol == "US100.cash"
 
+        if timeframe == mt5_fetcher.mt5.TIMEFRAME_H1:
+
+            return np.array([], dtype=MT5_DTYPE)
+
         assert timeframe == (
             mt5_fetcher.TIMEFRAME_MAP["M1"]
         )
@@ -244,10 +248,39 @@ def test_native_annual_pipeline(
         "unobserved_minutes"
     ] == 525596
 
-    assert terminal.fetch.call_count == 12
+    m1_requests = [
+        call.args
+        for call in terminal.fetch.call_args_list
+        if call.args[1] == mt5_fetcher.mt5.TIMEFRAME_M1
+    ]
 
-    first_request = terminal.fetch.call_args_list[0].args
-    last_request = terminal.fetch.call_args_list[-1].args
+    h1_requests = [
+        call.args
+        for call in terminal.fetch.call_args_list
+        if call.args[1] == mt5_fetcher.mt5.TIMEFRAME_H1
+    ]
+
+    assert len(m1_requests) == 12
+    assert len(h1_requests) == 12
+    assert terminal.fetch.call_count == 24
+
+    assert result["m1_export_path"] is None
+    assert result["quarantine_path"] == csv_path
+    assert csv_path.parent.name == "quarantine"
+
+    assert metadata["requested_timeframe"] == "M1"
+    assert metadata["timeframe"] == "unverified"
+
+    assert "missing_h1_reference" in (
+        result["timeframe_decision"]["blocking_reasons"]
+    )
+
+    assert "insufficient_minute_level_evidence" in (
+        result["timeframe_decision"]["blocking_reasons"]
+    )
+
+    first_request = m1_requests[0]
+    last_request = m1_requests[-1]
 
     assert first_request[2] == datetime(
         2025, 1, 1, 2, 0,
@@ -284,8 +317,14 @@ def test_native_annual_pipeline(
         original,
     )
 
-    terminal.initialize.assert_called_once()
-    terminal.shutdown.assert_called_once()
+    assert len(
+        diagnostics["h1_reference"]["chunk_diagnostics"]
+    ) == 12
+
+    assert diagnostics["h1_reference"]["rows_fetched"] == 0
+
+    assert terminal.initialize.call_count == 2
+    assert terminal.shutdown.call_count == 2
 
 
 def test_currently_forming_candle_excluded(
@@ -314,6 +353,9 @@ def test_currently_forming_candle_excluded(
     )
 
     assert len(candles) == 3
+
+    assert result["m1_export_path"] is None
+    assert result["csv_path"].parent.name == "quarantine"
 
     assert pd.Timestamp(
         candles.iloc[-1]["datetime"]
@@ -456,6 +498,16 @@ def test_empty_native_history(
 
     assert candles.empty
     assert "mt5_time_raw" in candles.columns
+
+    assert result["m1_export_path"] is None
+    assert result["csv_path"].parent.name == "quarantine"
+
+    assert result["timeframe_decision"]["status"] == (
+        "no_observations"
+    )
+
+    terminal.initialize.assert_called_once()
+    terminal.shutdown.assert_called_once()
 
     metadata = read_json(
         result["metadata_path"]
