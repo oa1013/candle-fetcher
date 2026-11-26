@@ -526,3 +526,221 @@ def validate_raw_m1_candles(
         ),
     }
 
+
+# ---------------------------------------------------------------------------
+# FTMO raw timestamp consistency validation
+# ---------------------------------------------------------------------------
+
+def validate_ftmo_timestamp_consistency(
+    candles: pd.DataFrame,
+    start_utc,
+    end_utc_exclusive,
+) -> dict:
+    """
+    Validate original FTMO Unix timestamp labels against
+    their corrected UTC timestamps.
+
+    Reports inconsistencies without modifying observations.
+
+    This checks consistency with the established FTMO
+    clock convention, not independent broker authenticity.
+    """
+
+    from .ftmo_time import (
+        FTMO_NEW_YORK_OFFSET,
+        FTMO_REFERENCE_TIMEZONE,
+    )
+
+    required_columns = (
+        "datetime",
+        "mt5_time_raw",
+    )
+
+    missing_columns = [
+        column
+        for column in required_columns
+        if column not in candles.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Missing required timestamp columns: "
+            f"{missing_columns}"
+        )
+
+    start = _parse_aware_timestamp(start_utc)
+    end = _parse_aware_timestamp(end_utc_exclusive)
+
+    if pd.isna(start) or pd.isna(end):
+        raise ValueError(
+            "Requested boundaries must be timezone-aware."
+        )
+
+    if end < start:
+        raise ValueError(
+            "End boundary cannot precede start boundary."
+        )
+
+    data = candles.reset_index(drop=True)
+
+    # Validate corrected timestamps without assuming
+    # a timezone for naive values.
+    corrected_source = data["datetime"]
+
+    if isinstance(
+        corrected_source.dtype,
+        pd.DatetimeTZDtype,
+    ):
+        corrected = corrected_source.dt.tz_convert(
+            "UTC"
+        )
+
+    else:
+        corrected = pd.to_datetime(
+            corrected_source.map(
+                _parse_aware_timestamp
+            ),
+            utc=True,
+            errors="coerce",
+        )
+
+    invalid_corrected = corrected.isna()
+
+    # Validate original Unix timestamp values.
+    raw_source = data["mt5_time_raw"]
+
+    raw_values = pd.to_numeric(
+        raw_source,
+        errors="coerce",
+    ).to_numpy(
+        dtype=float,
+        na_value=np.nan,
+    )
+
+    boolean_values = raw_source.map(
+        lambda value: isinstance(
+            value, (bool, np.bool_)
+        )
+    ).to_numpy(dtype=bool)
+
+    finite = np.isfinite(raw_values)
+
+    whole_seconds = np.zeros(
+        len(data),
+        dtype=bool,
+    )
+
+    whole_seconds[finite] = (
+        raw_values[finite]
+        == np.floor(raw_values[finite])
+    )
+
+    # Restrict Unix seconds to a safely representable
+    # historical timestamp range.
+    valid_raw = (
+        finite
+        & whole_seconds
+        & ~boolean_values
+        & (raw_values >= 0)
+        & (raw_values <= 9223372036)
+    )
+
+    safe_seconds = pd.Series(
+        raw_values,
+        index=data.index,
+    ).where(valid_raw)
+
+    server_labels = pd.to_datetime(
+        safe_seconds,
+        unit="s",
+        utc=True,
+        errors="coerce",
+    )
+
+    # Reconstruct the New York wall clock using
+    # the established FTMO server convention.
+    server_wall = server_labels.dt.tz_localize(
+        None
+    )
+
+    new_york_wall = (
+        server_wall
+        - pd.Timedelta(
+            FTMO_NEW_YORK_OFFSET
+        )
+    )
+
+    # Ambiguous and nonexistent DST timestamps
+    # must be reported, never guessed.
+    decoded = (
+        new_york_wall
+        .dt.tz_localize(
+            FTMO_REFERENCE_TIMEZONE,
+            ambiguous="NaT",
+            nonexistent="NaT",
+        )
+        .dt.tz_convert("UTC")
+    )
+
+    undecodable_raw = (
+        valid_raw & decoded.isna()
+    )
+
+    comparable = (
+        corrected.notna()
+        & decoded.notna()
+        & valid_raw
+    )
+
+    timestamp_mismatch = (
+        comparable
+        & corrected.ne(decoded)
+    )
+
+    # Annual boundaries are half-open:
+    # start inclusive, end exclusive.
+    outside_requested_range = (
+        corrected.notna()
+        & (
+            (corrected < start)
+            | (corrected >= end)
+        )
+    )
+
+    result = {
+        "total_candles": len(data),
+
+        "invalid_raw_timestamp_rows": int(
+            (~valid_raw).sum()
+        ),
+
+        "invalid_corrected_timestamp_rows": int(
+            invalid_corrected.sum()
+        ),
+
+        "undecodable_raw_timestamp_rows": int(
+            undecodable_raw.sum()
+        ),
+
+        "timestamp_mismatch_rows": int(
+            timestamp_mismatch.sum()
+        ),
+
+        "outside_requested_range_rows": int(
+            outside_requested_range.sum()
+        ),
+    }
+
+    result["is_consistent"] = all(
+        result[field] == 0
+        for field in (
+            "invalid_raw_timestamp_rows",
+            "invalid_corrected_timestamp_rows",
+            "undecodable_raw_timestamp_rows",
+            "timestamp_mismatch_rows",
+            "outside_requested_range_rows",
+        )
+    )
+
+    return result
+
