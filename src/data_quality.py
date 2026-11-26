@@ -744,3 +744,403 @@ def validate_ftmo_timestamp_consistency(
 
     return result
 
+
+# ---------------------------------------------------------------------------
+# Historical research coverage and gap reporting
+# ---------------------------------------------------------------------------
+
+def build_research_coverage_report(
+    candles: pd.DataFrame,
+    start_utc,
+    end_utc_exclusive,
+) -> dict:
+    """
+    Measure observed M1 coverage across a requested UTC interval.
+
+    Unobserved calendar minutes are not automatically classified
+    as missing trading candles.
+
+    No observations are modified or reconstructed.
+    """
+
+    if "datetime" not in candles.columns:
+        raise ValueError(
+            "Missing required datetime column."
+        )
+
+    start = _parse_aware_timestamp(start_utc)
+    end = _parse_aware_timestamp(end_utc_exclusive)
+
+    minute = pd.Timedelta(minutes=1)
+    day = pd.Timedelta(days=1)
+
+    if pd.isna(start) or pd.isna(end):
+        raise ValueError(
+            "Coverage boundaries must be timezone-aware."
+        )
+
+    if end < start:
+        raise ValueError(
+            "End boundary cannot precede start boundary."
+        )
+
+    if (
+        start != start.floor("min")
+        or end != end.floor("min")
+    ):
+        raise ValueError(
+            "Coverage boundaries must be minute-aligned."
+        )
+
+    source = candles["datetime"]
+
+    if isinstance(source.dtype, pd.DatetimeTZDtype):
+        timestamps = source.dt.tz_convert("UTC")
+
+    else:
+        timestamps = pd.to_datetime(
+            source.map(_parse_aware_timestamp),
+            utc=True,
+            errors="coerce",
+        )
+
+    observed = pd.DatetimeIndex(timestamps)
+
+    if observed.isna().any():
+        raise ValueError(
+            "Invalid or timezone-naive timestamps found."
+        )
+
+    if observed.has_duplicates:
+        raise ValueError(
+            "Duplicate timestamps found."
+        )
+
+    if not observed.is_monotonic_increasing:
+        raise ValueError(
+            "Timestamps must be chronologically ordered."
+        )
+
+    if (observed != observed.floor("min")).any():
+        raise ValueError(
+            "Non-minute-aligned observations found."
+        )
+
+    if ((observed < start) | (observed >= end)).any():
+        raise ValueError(
+            "Observations outside requested coverage window."
+        )
+
+    # -------------------------------------------------------
+    # Daily coverage
+    # -------------------------------------------------------
+
+    daily_columns = [
+        "date_utc",
+        "requested_calendar_minutes",
+        "recorded_candles",
+        "unobserved_minutes",
+        "coverage_status",
+    ]
+
+    daily_records = []
+
+    observed_counts = pd.Series(
+        observed.normalize()
+    ).value_counts()
+
+    if start < end:
+        requested_days = pd.date_range(
+            start=start.normalize(),
+            end=(end - minute).normalize(),
+            freq="D",
+        )
+
+        for current_day in requested_days:
+
+            period_start = max(
+                start,
+                current_day,
+            )
+
+            period_end = min(
+                end,
+                current_day + day,
+            )
+
+            requested_minutes = int(
+                (period_end - period_start) / minute
+            )
+
+            recorded = int(
+                observed_counts.get(current_day, 0)
+            )
+
+            unobserved = (
+                requested_minutes - recorded
+            )
+
+            if recorded == 0:
+                status = "no_observations"
+
+            elif unobserved == 0:
+                status = "all_calendar_minutes_observed"
+
+            else:
+                status = "some_calendar_minutes_unobserved"
+
+            daily_records.append({
+                "date_utc": current_day.strftime("%Y-%m-%d"),
+                "requested_calendar_minutes": requested_minutes,
+                "recorded_candles": recorded,
+                "unobserved_minutes": unobserved,
+                "coverage_status": status,
+            })
+
+    daily = pd.DataFrame(
+        daily_records,
+        columns=daily_columns,
+    )
+
+    # -------------------------------------------------------
+    # Monthly coverage
+    # -------------------------------------------------------
+
+    monthly_columns = [
+        "month_utc",
+        "requested_calendar_minutes",
+        "recorded_candles",
+        "unobserved_minutes",
+        "days_requested",
+        "days_with_observations",
+        "days_without_observations",
+        "coverage_status",
+    ]
+
+    monthly_records = []
+
+    if not daily.empty:
+
+        month_labels = daily["date_utc"].str[:7]
+
+        for month, group in daily.groupby(
+            month_labels,
+            sort=True,
+        ):
+
+            requested_minutes = int(
+                group["requested_calendar_minutes"].sum()
+            )
+
+            recorded = int(
+                group["recorded_candles"].sum()
+            )
+
+            unobserved = int(
+                group["unobserved_minutes"].sum()
+            )
+
+            days_with_observations = int(
+                (group["recorded_candles"] > 0).sum()
+            )
+
+            if recorded == 0:
+                status = "no_observations"
+
+            elif unobserved == 0:
+                status = "all_calendar_minutes_observed"
+
+            else:
+                status = "some_calendar_minutes_unobserved"
+
+            monthly_records.append({
+                "month_utc": month,
+                "requested_calendar_minutes": requested_minutes,
+                "recorded_candles": recorded,
+                "unobserved_minutes": unobserved,
+                "days_requested": len(group),
+                "days_with_observations": days_with_observations,
+                "days_without_observations": (
+                    len(group) - days_with_observations
+                ),
+                "coverage_status": status,
+            })
+
+    monthly = pd.DataFrame(
+        monthly_records,
+        columns=monthly_columns,
+    )
+
+    # -------------------------------------------------------
+    # Leading, internal and trailing gaps
+    # -------------------------------------------------------
+
+    gap_columns = [
+        "gap_start_utc",
+        "gap_end_utc_exclusive",
+        "unobserved_minutes",
+        "gap_type",
+        "classification",
+    ]
+
+    gap_records = []
+
+    def add_gap(gap_start, gap_end, gap_type):
+
+        if gap_end <= gap_start:
+            return
+
+        gap_records.append({
+            "gap_start_utc": gap_start,
+            "gap_end_utc_exclusive": gap_end,
+            "unobserved_minutes": int(
+                (gap_end - gap_start) / minute
+            ),
+            "gap_type": gap_type,
+            "classification": "unverified",
+        })
+
+    if len(observed) == 0:
+
+        add_gap(
+            start,
+            end,
+            "entire_period",
+        )
+
+    else:
+
+        add_gap(
+            start,
+            observed[0],
+            "leading",
+        )
+
+        # Identify interrupted M1 sequences without
+        # constructing artificial candle observations.
+        differences = (
+            observed[1:] - observed[:-1]
+        )
+
+        gap_positions = np.flatnonzero(
+            differences > minute
+        )
+
+        for position in gap_positions:
+
+            add_gap(
+                observed[position] + minute,
+                observed[position + 1],
+                "internal",
+            )
+
+        add_gap(
+            observed[-1] + minute,
+            end,
+            "trailing",
+        )
+
+    gaps = pd.DataFrame(
+        gap_records,
+        columns=gap_columns,
+    )
+
+    # -------------------------------------------------------
+    # Overall coverage summary
+    # -------------------------------------------------------
+
+    requested_calendar_minutes = int(
+        (end - start) / minute
+    )
+
+    recorded_candles = len(observed)
+
+    unobserved_minutes = (
+        requested_calendar_minutes
+        - recorded_candles
+    )
+
+    summary = {
+        "requested_start_utc": start.isoformat(),
+
+        "requested_end_utc_exclusive": (
+            end.isoformat()
+        ),
+
+        "requested_calendar_minutes": (
+            requested_calendar_minutes
+        ),
+
+        "recorded_candles": recorded_candles,
+
+        "unobserved_minutes": unobserved_minutes,
+
+        "first_datetime_utc": (
+            observed[0].isoformat()
+            if recorded_candles > 0
+            else None
+        ),
+
+        "last_datetime_utc": (
+            observed[-1].isoformat()
+            if recorded_candles > 0
+            else None
+        ),
+
+        "days_requested": len(daily),
+
+        "days_with_observations": int(
+            (daily["recorded_candles"] > 0).sum()
+        ),
+
+        "days_without_observations": int(
+            (daily["recorded_candles"] == 0).sum()
+        ),
+
+        "months_requested": len(monthly),
+
+        "months_without_observations": int(
+            (monthly["recorded_candles"] == 0).sum()
+        ),
+
+        "gap_count": len(gaps),
+
+        "expected_trading_minutes": None,
+
+        "confirmed_missing_trading_minutes": None,
+
+        "historical_trading_calendar_verified": False,
+
+        "coverage_limitation": (
+            "Unobserved calendar minutes may include "
+            "market closures, holidays, maintenance, "
+            "unavailable history or missing trading data. "
+            "Historical completeness cannot be established "
+            "without a verified broker trading calendar."
+        ),
+    }
+
+    # Reconcile every report against the same observations.
+
+    if int(daily["recorded_candles"].sum()) != recorded_candles:
+        raise RuntimeError(
+            "Daily candle count reconciliation failed."
+        )
+
+    if int(monthly["recorded_candles"].sum()) != recorded_candles:
+        raise RuntimeError(
+            "Monthly candle count reconciliation failed."
+        )
+
+    if int(gaps["unobserved_minutes"].sum()) != unobserved_minutes:
+        raise RuntimeError(
+            "Gap duration reconciliation failed."
+        )
+
+    return {
+        "summary": summary,
+        "daily": daily,
+        "monthly": monthly,
+        "gaps": gaps,
+    }
+
