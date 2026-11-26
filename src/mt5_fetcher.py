@@ -189,12 +189,99 @@ def empty_candle_dataframe() -> pd.DataFrame:
     )
 
 
-def rates_to_dataframe(rates, *, ftmo_athens_clock: bool = False) -> pd.DataFrame:
+class CandleConflictError(ValueError):
+    """Conflicting candle observations requiring investigation."""
+
+    def __init__(self, conflicting_rows: pd.DataFrame):
+        self.conflicting_rows = conflicting_rows.copy()
+
+        count = conflicting_rows["datetime"].nunique(
+            dropna=False
+        )
+
+        super().__init__(
+            f"Conflicting candle observations at "
+            f"{count} timestamp(s). Export stopped."
+        )
+
+
+def consolidate_duplicate_candles(
+    df: pd.DataFrame,
+    *,
+    duplicate_diagnostics: dict | None = None,
+) -> pd.DataFrame:
+    """Consolidate identical candles and reject conflicts."""
+
+    if duplicate_diagnostics is not None:
+        duplicate_diagnostics.setdefault(
+            "identical_duplicates", 0
+        )
+        duplicate_diagnostics.setdefault(
+            "conflicting_timestamps", 0
+        )
+
+    duplicate_mask = df.duplicated(
+        subset=["datetime"],
+        keep=False,
+    )
+
+    if not duplicate_mask.any():
+        return df
+
+    duplicate_rows = df.loc[duplicate_mask]
+
+    unique_rows = duplicate_rows.drop_duplicates()
+
+    identical_count = (
+        len(duplicate_rows) - len(unique_rows)
+    )
+
+    conflicting_mask = unique_rows.duplicated(
+        subset=["datetime"],
+        keep=False,
+    )
+
+    conflicting_times = unique_rows.loc[
+        conflicting_mask, "datetime"
+    ].unique()
+
+    if duplicate_diagnostics is not None:
+        duplicate_diagnostics[
+            "identical_duplicates"
+        ] += identical_count
+
+        duplicate_diagnostics[
+            "conflicting_timestamps"
+        ] += len(conflicting_times)
+
+    if len(conflicting_times) > 0:
+        conflicting_rows = duplicate_rows.loc[
+            duplicate_rows["datetime"].isin(
+                conflicting_times
+            )
+        ]
+
+        raise CandleConflictError(conflicting_rows)
+
+    return df.drop_duplicates(
+        subset=["datetime"]
+    )
+
+
+def rates_to_dataframe(
+    rates,
+    *,
+    ftmo_athens_clock: bool = False,
+    duplicate_diagnostics: dict | None = None,
+) -> pd.DataFrame:
     """Convert MT5 rates output into a clean OHLCV DataFrame."""
     df = pd.DataFrame(rates)
 
     if df.empty:
-        return empty_candle_dataframe()
+        return consolidate_duplicate_candles(
+            empty_candle_dataframe(),
+            duplicate_diagnostics=duplicate_diagnostics,
+        )
 
     df["mt5_time_raw"] = df["time"].copy()
 
@@ -223,7 +310,10 @@ def rates_to_dataframe(rates, *, ftmo_athens_clock: bool = False) -> pd.DataFram
         ]
     ]
 
-    df = df.drop_duplicates(subset=["datetime"])
+    df = consolidate_duplicate_candles(
+        df,
+        duplicate_diagnostics=duplicate_diagnostics,
+    )
     df = df.sort_values("datetime").reset_index(drop=True)
 
     return df
@@ -242,6 +332,7 @@ def fetch_candles_by_range(
     *,
     ftmo_athens_clock: bool = False,
     diagnostics: list[dict] | None = None,
+    duplicate_diagnostics: dict | None = None,
 ) -> pd.DataFrame:
     """
     Fetch candles from MT5 between explicit UTC datetimes.
@@ -341,6 +432,7 @@ def fetch_candles_by_range(
                 chunk_df = rates_to_dataframe(
                     rates,
                     ftmo_athens_clock=ftmo_athens_clock,
+                    duplicate_diagnostics=duplicate_diagnostics,
                 )
             except Exception:
                 record["status"] = "conversion_failed"
@@ -362,11 +454,17 @@ def fetch_candles_by_range(
         chunk_start = chunk_end
 
     if not chunks:
-        return empty_candle_dataframe()
+        return consolidate_duplicate_candles(
+            empty_candle_dataframe(),
+            duplicate_diagnostics=duplicate_diagnostics,
+        )
 
     df = pd.concat(chunks, ignore_index=True)
 
-    df = df.drop_duplicates(subset=["datetime"])
+    df = consolidate_duplicate_candles(
+        df,
+        duplicate_diagnostics=duplicate_diagnostics,
+    )
     df = df.sort_values("datetime").reset_index(drop=True)
 
     df = df[
